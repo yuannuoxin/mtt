@@ -14,7 +14,13 @@ import org.springframework.context.annotation.ComponentScan;
  * - com.mtd.common.satoken: Sa-Token 认证相关组件
  */
 @SpringBootApplication
-@ComponentScan(basePackages = {"com.mtd.demo", "com.mtd.common.mybatis", "com.mtd.common.exception.handler", "com.mtd.common.satoken"})
+@ComponentScan(basePackages = {"com.mtd.demo",
+        "com.mtd.common.mybatis",
+        "com.mtd.common.exception.handler",
+        "com.mtd.common.satoken",
+        "com.mtd.common.web",
+        "com.mtd.common.redis"
+})
 public class DemoApplication {
 
     public static void main(String[] args) {

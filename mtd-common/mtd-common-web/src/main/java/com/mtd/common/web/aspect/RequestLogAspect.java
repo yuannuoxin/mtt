@@ -1,4 +1,4 @@
-package com.mtd.demo.aspect;
+package com.mtd.common.web.aspect;
 
 import cn.hutool.extra.servlet.JakartaServletUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -7,10 +7,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.AfterReturning;
+import org.aspectj.lang.annotation.AfterThrowing;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.annotation.Pointcut;
-import org.aspectj.lang.annotation.AfterThrowing;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
@@ -53,7 +53,7 @@ public class RequestLogAspect {
     /**
      * 定义切点：所有 Controller 层方法
      */
-    @Pointcut("execution(* com.mtd.demo.controller..*.*(..))")
+    @Pointcut("execution(* com..controller..*.*(..))")
     public void controllerPointcut() {
     }
 

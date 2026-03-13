@@ -5,12 +5,16 @@ import cn.hutool.crypto.SecureUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.mtd.common.core.constant.CommonConstants;
+import com.mtd.common.core.request.IdRequest;
 import com.mtd.common.core.response.PageResponse;
 import com.mtd.common.core.result.Result;
 import com.mtd.common.core.result.ResultCode;
 import com.mtd.common.mybatis.base.BaseEntity;
 import com.mtd.demo.entity.User;
-import com.mtd.demo.request.*;
+import com.mtd.demo.request.MockUserBatchRequest;
+import com.mtd.demo.request.UserListRequest;
+import com.mtd.demo.request.UserPageRequest;
+import com.mtd.demo.request.UserSaveRequest;
 import com.mtd.demo.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -83,7 +87,7 @@ public class UserController {
 
     @Operation(summary = "根据 ID 查询用户", description = "通过用户 ID 获取用户详细信息")
     @PostMapping("/get")
-    public Result<User> get(@RequestBody UserGetRequest request) {
+    public Result<User> get(@RequestBody IdRequest request) {
         User user = userService.getById(request.getId());
         if (user == null) {
             return Result.error(ResultCode.NOT_FOUND);
@@ -180,7 +184,7 @@ public class UserController {
 
     @Operation(summary = "删除用户", description = "根据 ID 删除用户（逻辑删除）")
     @PostMapping("/delete")
-    public Result<Boolean> delete(@RequestBody UserDeleteRequest request) {
+    public Result<Boolean> delete(@RequestBody IdRequest request) {
         boolean removed = userService.removeById(request.getId());
         return Result.success(removed);
     }

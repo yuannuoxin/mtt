@@ -1,4 +1,4 @@
-package com.mtd.demo.advice;
+package com.mtd.common.web.advice;
 
 import com.mtd.common.core.result.Result;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +17,7 @@ import org.springframework.web.servlet.mvc.method.annotation.ResponseBodyAdvice;
  */
 @Slf4j
 @ControllerAdvice
-public class MyResponseBodyAdviceImpl implements ResponseBodyAdvice<Object> {
+public class ResponseBodyAdviceImpl implements ResponseBodyAdvice<Object> {
 
     @Override
     public boolean supports(MethodParameter returnType, Class<? extends HttpMessageConverter<?>> converterType) {
@@ -34,7 +34,7 @@ public class MyResponseBodyAdviceImpl implements ResponseBodyAdvice<Object> {
                                    ServerHttpResponse response) {
         // 从 MDC 中获取 RequestID
         String requestId = MDC.get("requestId");
-
+        
         if (body instanceof Result && requestId != null) {
             Result<?> result = (Result<?>) body;
             result.setRequestId(requestId);

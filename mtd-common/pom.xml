@@ -35,5 +35,7 @@
         <module>mtd-common-exception</module>
         <module>mtd-common-mybatis</module>
         <module>mtd-common-satoken</module>
+        <module>mtd-common-web</module>
+        <module>mtd-common-redis</module>
     </modules>
 </project>
