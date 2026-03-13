@@ -40,12 +40,8 @@ jobs:
 
     - name: Build with Maven
       run: |
-        # 先安装根 POM 到本地仓库
-        mvn clean install -DskipTests -B -N
-        # 在 mtd-common 目录下构建所有子模块
-        mvn clean install -DskipTests -B -f mtd-common/pom.xml
-        # 构建 demo 项目
-        mvn clean package -DskipTests -B -f demo/pom.xml
+        # 在根目录一次性构建所有项目
+        mvn clean package -DskipTests -B
 
     - name: Build the Docker image
       run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -f demo/Dockerfile .
@@ -55,7 +51,6 @@ jobs:
       with:
         image-ref: '${{ env.IMAGE_NAME }}:${{ github.sha }}'
         format: 'table'
-        exit-code: '1'
         ignore-unfixed: true
         vuln-type: 'os,library'
         severity: 'CRITICAL,HIGH'

@@ -1,49 +1,25 @@
 FROM eclipse-temurin:17-jdk-alpine
 
-WORKDIR /app
+WORKDIR /build
 
 # 安装 Maven
 RUN apk add --no-cache maven
 
-# 复制 pom.xml 文件以利用 Docker 缓存层
-COPY pom.xml ./
-COPY mtd-common/pom.xml ./mtd-common/
-COPY mtd-common/mtd-common-bom/pom.xml ./mtd-common/mtd-common-bom/
-COPY demo/pom.xml ./demo/
+# 复制所有源代码
+COPY . .
 
-# 安装父 pom 到本地 Maven 仓库
-RUN mvn clean install -DskipTests -B -N -f pom.xml && \
-    # 安装 mtd-common-bom (不依赖其他模块)
-    mvn clean install -DskipTests -B -N -f mtd-common/mtd-common-bom/pom.xml && \
-    # 安装 mtd-common parent
-    mvn clean install -DskipTests -B -N -f mtd-common/pom.xml
+# 在根目录一次性构建所有项目
+RUN mvn clean package -DskipTests -B
 
-# 复制 mtd-common 子模块源码并安装
-COPY mtd-common/mtd-common-core/src ./mtd-common/mtd-common-core/src
-COPY mtd-common/mtd-common-exception/src ./mtd-common/mtd-common-exception/src
-COPY mtd-common/mtd-common-mybatis/src ./mtd-common/mtd-common-mybatis/src
-COPY mtd-common/mtd-common-redis/src ./mtd-common/mtd-common-redis/src
-COPY mtd-common/mtd-common-satoken/src ./mtd-common/mtd-common-satoken/src
-COPY mtd-common/mtd-common-web/src ./mtd-common/mtd-common-web/src
+# --- 运行阶段 ---
+FROM eclipse-temurin:17-jdk-alpine
 
-# 安装所有 mtd-common 子模块
-RUN mvn clean install -DskipTests -B -f mtd-common/mtd-common-core/pom.xml && \
-    mvn clean install -DskipTests -B -f mtd-common/mtd-common-exception/pom.xml && \
-    mvn clean install -DskipTests -B -f mtd-common/mtd-common-mybatis/pom.xml && \
-    mvn clean install -DskipTests -B -f mtd-common/mtd-common-redis/pom.xml && \
-    mvn clean install -DskipTests -B -f mtd-common/mtd-common-satoken/pom.xml && \
-    mvn clean install -DskipTests -B -f mtd-common/mtd-common-web/pom.xml
+WORKDIR /app
 
-# 现在下载 demo 项目的依赖
-RUN mvn dependency:go-offline -B -f demo/pom.xml
-
-# 复制 demo 项目源代码
-COPY demo/src ./demo/src
-
-# 构建 demo 项目
-RUN mvn clean package -DskipTests -B -f demo/pom.xml
+# 只复制打包好的 JAR 文件
+COPY --from=0 /build/demo/target/demo-1.0.0-SNAPSHOT.jar ./app.jar
 
 # 运行应用
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "/app/demo/target/demo-1.0.0-SNAPSHOT.jar"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
