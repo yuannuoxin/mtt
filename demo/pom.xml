@@ -17,7 +17,7 @@
     <description>Demo Module</description>
 
     <properties>
-        <spring-boot.version>3.2.0</spring-boot.version>
+        <!-- Lombok 版本 (与 BOM 保持一致) -->
         <lombok.version>1.18.30</lombok.version>
     </properties>
 
@@ -125,7 +125,13 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
-                <version>${spring-boot.version}</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
                 <configuration>
                     <excludes>
                         <exclude>
