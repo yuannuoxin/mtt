@@ -11,10 +11,12 @@ COPY mtd-common/pom.xml ./mtd-common/
 COPY mtd-common/mtd-common-bom/pom.xml ./mtd-common/mtd-common-bom/
 COPY demo/pom.xml ./demo/
 
-# 安装父 pom 和 mtd-common-bom 到本地 Maven 仓库
+# 安装父 pom 到本地 Maven 仓库
 RUN mvn clean install -DskipTests -B -N -f pom.xml && \
-    mvn clean install -DskipTests -B -N -f mtd-common/pom.xml && \
-    mvn clean install -DskipTests -B -N -f mtd-common/mtd-common-bom/pom.xml
+    # 安装 mtd-common-bom (不依赖其他模块)
+    mvn clean install -DskipTests -B -N -f mtd-common/mtd-common-bom/pom.xml && \
+    # 安装 mtd-common parent
+    mvn clean install -DskipTests -B -N -f mtd-common/pom.xml
 
 # 下载依赖
 RUN mvn dependency:go-offline -B -f demo/pom.xml
@@ -28,7 +30,7 @@ COPY mtd-common/mtd-common-redis/src ./mtd-common/mtd-common-redis/src
 COPY mtd-common/mtd-common-satoken/src ./mtd-common/mtd-common-satoken/src
 COPY mtd-common/mtd-common-web/src ./mtd-common/mtd-common-web/src
 
-# 安装所有 mtd-common 模块
+# 安装所有 mtd-common 子模块
 RUN mvn clean install -DskipTests -B -f mtd-common/mtd-common-core/pom.xml && \
     mvn clean install -DskipTests -B -f mtd-common/mtd-common-exception/pom.xml && \
     mvn clean install -DskipTests -B -f mtd-common/mtd-common-mybatis/pom.xml && \
