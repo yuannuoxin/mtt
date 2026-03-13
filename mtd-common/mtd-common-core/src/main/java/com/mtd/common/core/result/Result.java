@@ -13,6 +13,7 @@ public class Result<T> implements Serializable {
     private String message;
     private T data;
     private Long timestamp;
+    private String requestId;
 
     public Result() {
         this.timestamp = System.currentTimeMillis();
@@ -49,9 +50,5 @@ public class Result<T> implements Serializable {
         result.setCode(code);
         result.setMessage(message);
         return result;
-    }
-
-    public boolean isSuccess() {
-        return ResultCode.SUCCESS.getCode().equals(this.code);
     }
 }

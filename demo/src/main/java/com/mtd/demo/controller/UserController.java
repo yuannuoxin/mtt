@@ -15,6 +15,7 @@ import com.mtd.demo.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,6 +27,7 @@ import java.util.List;
 /**
  * 用户控制器
  */
+@Slf4j
 @Tag(name = "用户管理", description = "用户相关接口")
 @RestController
 @RequestMapping("/user")
@@ -115,6 +117,7 @@ public class UserController {
     @Operation(summary = "查询用户分页", description = "分页查询用户信息，支持用户名、手机号、状态筛选和排序")
     @PostMapping("/list/page")
     public Result<PageResponse<User>> listPage(@RequestBody(required = false) UserPageRequest request) {
+        log.info("分页查询用户信息：{}", request);
         // 如果请求参数为空，使用默认参数
         if (request == null) {
             request = new UserPageRequest();
