@@ -18,11 +18,7 @@ RUN mvn clean install -DskipTests -B -N -f pom.xml && \
     # 安装 mtd-common parent
     mvn clean install -DskipTests -B -N -f mtd-common/pom.xml
 
-# 下载依赖
-RUN mvn dependency:go-offline -B -f demo/pom.xml
-
-# 复制源代码
-COPY demo/src ./demo/src
+# 复制 mtd-common 子模块源码并安装
 COPY mtd-common/mtd-common-core/src ./mtd-common/mtd-common-core/src
 COPY mtd-common/mtd-common-exception/src ./mtd-common/mtd-common-exception/src
 COPY mtd-common/mtd-common-mybatis/src ./mtd-common/mtd-common-mybatis/src
@@ -37,6 +33,12 @@ RUN mvn clean install -DskipTests -B -f mtd-common/mtd-common-core/pom.xml && \
     mvn clean install -DskipTests -B -f mtd-common/mtd-common-redis/pom.xml && \
     mvn clean install -DskipTests -B -f mtd-common/mtd-common-satoken/pom.xml && \
     mvn clean install -DskipTests -B -f mtd-common/mtd-common-web/pom.xml
+
+# 现在下载 demo 项目的依赖
+RUN mvn dependency:go-offline -B -f demo/pom.xml
+
+# 复制 demo 项目源代码
+COPY demo/src ./demo/src
 
 # 构建 demo 项目
 RUN mvn clean package -DskipTests -B -f demo/pom.xml
