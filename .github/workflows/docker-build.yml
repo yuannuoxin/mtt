@@ -6,7 +6,7 @@ on:
       docker_tag:
         description: 'Docker image tag (optional, defaults to commit SHA)'
         required: false
-        default: ''
+        default: 'latest'
 
 env:
   REGISTRY: ghcr.io
@@ -43,8 +43,17 @@ jobs:
         # 在根目录一次性构建所有项目
         mvn clean package -DskipTests -B
 
+    - name: Set Docker tag
+      id: docker_tag
+      run: |
+        if [ -n "${{ github.event.inputs.docker_tag }}" ]; then
+          echo "tag=${{ github.event.inputs.docker_tag }}" >> $GITHUB_OUTPUT
+        else
+          echo "tag=${{ github.sha }}" >> $GITHUB_OUTPUT
+        fi
+
     - name: Build the Docker image
-      run: docker build -t ${{ env.IMAGE_NAME }}:${{ github.sha }} -f demo/Dockerfile .
+      run: docker build -t ${{ env.IMAGE_NAME }}:${{ steps.docker_tag.outputs.tag }} -f demo/Dockerfile .
       
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -89,6 +98,7 @@ jobs:
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=sha,prefix=
+          type=raw,value=${{ steps.docker_tag.outputs.tag }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.docker_tag != '' }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
