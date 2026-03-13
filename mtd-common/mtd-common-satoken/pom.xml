@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 
+         http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>com.mtd</groupId>
+        <artifactId>mtd-common</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+    </parent>
+
+    <artifactId>mtd-common-satoken</artifactId>
+    <packaging>jar</packaging>
+    <name>mtd-common-satoken</name>
+    <description>MTD Sa-Token Integration</description>
+
+    <dependencies>
+        <!-- MTD Core -->
+        <dependency>
+            <groupId>com.mtd</groupId>
+            <artifactId>mtd-common-core</artifactId>
+        </dependency>
+        
+        <!-- MTD MyBatis (需要 UserIdProvider 接口) -->
+        <dependency>
+            <groupId>com.mtd</groupId>
+            <artifactId>mtd-common-mybatis</artifactId>
+        </dependency>
+        
+        <!-- Sa-Token -->
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-spring-boot3-starter</artifactId>
+        </dependency>
+        
+        <dependency>
+            <groupId>cn.dev33</groupId>
+            <artifactId>sa-token-redis-jackson</artifactId>
+        </dependency>
+        
+        <!-- Redis -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-data-redis</artifactId>
+        </dependency>
+        
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>
