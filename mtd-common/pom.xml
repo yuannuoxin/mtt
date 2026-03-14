@@ -16,21 +16,7 @@
     <name>mtd-common</name>
     <description>MTD Common Modules</description>
 
-    <dependencyManagement>
-        <dependencies>
-            <!-- Import MTD Common BOM -->
-            <dependency>
-                <groupId>com.mtd</groupId>
-                <artifactId>mtd-common-bom</artifactId>
-                <version>${project.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
     <modules>
-        <module>mtd-common-bom</module>
         <module>mtd-common-core</module>
         <module>mtd-common-mybatis</module>
         <module>mtd-common-satoken</module>
