@@ -98,6 +98,7 @@ public class UserController {
     @Operation(summary = "查询用户列表", description = "查询所有符合条件的用户（不分页，返回全部数据）")
     @PostMapping("/list/all")
     public Result<java.util.List<User>> listAll(@RequestBody(required = false) UserListRequest request) {
+        log.info("查询所有用户信息：{}", request);
         // 如果请求参数为空，使用默认参数
         if (request == null) {
             request = new UserListRequest();

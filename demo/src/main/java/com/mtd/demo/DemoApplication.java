@@ -16,7 +16,6 @@ import org.springframework.context.annotation.ComponentScan;
 @SpringBootApplication
 @ComponentScan(basePackages = {"com.mtd.demo",
         "com.mtd.common.mybatis",
-        "com.mtd.common.exception.handler",
         "com.mtd.common.satoken",
         "com.mtd.common.web",
         "com.mtd.common.redis"

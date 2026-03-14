@@ -1,4 +1,4 @@
-package com.mtd.common.exception.handler;
+package com.mtd.common.web.exception;
 
 import com.mtd.common.core.exception.BusinessException;
 import com.mtd.common.core.exception.CriticalBusinessException;

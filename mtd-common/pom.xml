@@ -32,7 +32,6 @@
     <modules>
         <module>mtd-common-bom</module>
         <module>mtd-common-core</module>
-        <module>mtd-common-exception</module>
         <module>mtd-common-mybatis</module>
         <module>mtd-common-satoken</module>
         <module>mtd-common-web</module>

@@ -6,10 +6,12 @@
     <property name="APP_NAME" value="demo"/>
 
     <!-- 控制台输出格式 -->
-    <property name="CONSOLE_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{requestId:-}] %-5level %logger{50} - %msg%n"/>
-    
+    <property name="CONSOLE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{requestId:-}] %-5level %logger{50} - %msg%n"/>
+
     <!-- 文件输出格式 -->
-    <property name="FILE_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{requestId:-}] %-5level %logger{50} - %msg%n"/>
+    <property name="FILE_PATTERN"
+              value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] [%X{requestId:-}] %-5level %logger{50} - %msg%n"/>
 
     <!-- 控制台输出 -->
     <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
@@ -63,8 +65,17 @@
         </filter>
     </appender>
 
-    <!-- 开发环境：只输出到控制台 -->
-    <springProfile name="dev">
+    <!-- RequestLogAspect 专用异步日志 -->
+    <appender name="ASYNC_REQUEST_LOG" class="ch.qos.logback.classic.AsyncAppender">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="INFO_FILE"/>
+        <queueSize>512</queueSize>
+        <discardingThreshold>0</discardingThreshold>
+        <includeCallerData>false</includeCallerData>
+    </appender>
+
+    <!-- local环境：只输出到控制台 -->
+    <springProfile name="local">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
         </root>
@@ -84,13 +95,17 @@
         <logger name="com.baomidou.mybatisplus" level="WARN"/>
     </springProfile>
 
-    <!-- 默认配置 -->
-    <springProfile name="default">
+    <!-- 默认配置：当指定了 profile 但没匹配上时，使用此配置 -->
+    <springProfile name="!local &amp; !prod">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="INFO_FILE"/>
             <appender-ref ref="ERROR_FILE"/>
         </root>
+        <!-- RequestLogAspect 使用异步日志 -->
+        <logger name="com.mtd.common.web.aspect.RequestLogAspect" level="INFO" additivity="false">
+            <appender-ref ref="ASYNC_REQUEST_LOG"/>
+        </logger>
         <logger name="com.mtd.demo" level="DEBUG"/>
         <logger name="org.springframework" level="INFO"/>
         <logger name="com.baomidou.mybatisplus" level="DEBUG"/>

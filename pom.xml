@@ -5,9 +5,14 @@
          http://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.mtd</groupId>
+    <parent>
+        <groupId>com.mtd</groupId>
+        <artifactId>mtd-common-bom</artifactId>
+        <version>1.0.0-SNAPSHOT</version>
+        <relativePath>./mtd-common/mtd-common-bom/pom.xml</relativePath>
+    </parent>
+
     <artifactId>mtd-parent</artifactId>
-    <version>1.0.0-SNAPSHOT</version>
     <packaging>pom</packaging>
     <name>mtd-parent</name>
     <description>MTD Parent Project</description>
