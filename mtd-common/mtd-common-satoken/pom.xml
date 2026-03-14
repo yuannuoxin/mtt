@@ -17,12 +17,6 @@
     <description>MTD Sa-Token Integration</description>
 
     <dependencies>
-        <!-- MTD Core -->
-        <dependency>
-            <groupId>com.mtd</groupId>
-            <artifactId>mtd-common-core</artifactId>
-        </dependency>
-        
         <!-- MTD MyBatis (需要 UserIdProvider 接口) -->
         <dependency>
             <groupId>com.mtd</groupId>
@@ -35,18 +29,13 @@
             <artifactId>sa-token-spring-boot3-starter</artifactId>
         </dependency>
         
+        <!-- Sa-Token Redis 集成 (Token 存储到 Redis) -->
         <dependency>
             <groupId>cn.dev33</groupId>
             <artifactId>sa-token-redis-jackson</artifactId>
         </dependency>
         
-        <!-- Redis -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
-        
-        <!-- Lombok -->
+        <!-- Lombok (备用) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

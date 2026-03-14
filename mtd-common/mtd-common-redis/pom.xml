@@ -29,7 +29,7 @@
             <artifactId>commons-pool2</artifactId>
         </dependency>
 
-        <!-- Jackson (Redis 序列化需要) -->
+        <!-- Jackson (Redis 序列化) -->
         <dependency>
             <groupId>com.fasterxml.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
@@ -40,18 +40,11 @@
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
 
-        <!-- Hutool -->
-        <dependency>
-            <groupId>cn.hutool</groupId>
-            <artifactId>hutool-all</artifactId>
-        </dependency>
-
-        <!-- Lombok -->
+        <!-- Lombok (备用) -->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
         </dependency>
-
     </dependencies>
 </project>
