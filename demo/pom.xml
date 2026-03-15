@@ -105,6 +105,14 @@
     </dependencies>
 
     <build>
+        <!-- 设置最终 JAR 包名称，包含 Git Commit ID -->
+        <finalName>${project.artifactId}-${project.version}-${git.commit.id.abbrev}</finalName>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+            </resource>
+        </resources>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
@@ -135,7 +143,7 @@
                     <source>17</source>
                     <target>17</target>
                     <encoding>UTF-8</encoding>
-                    <parameters>true</parameters>  <!-- 保留方法参数名 -->
+                    <parameters>true</parameters>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
@@ -143,6 +151,42 @@
                             <version>${lombok.version}</version>
                         </path>
                     </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            
+            <!-- Git Commit ID 插件 -->
+            <plugin>
+                <groupId>io.github.git-commit-id</groupId>
+                <artifactId>git-commit-id-maven-plugin</artifactId>
+                <version>5.0.0</version>
+                <executions>
+                    <execution>
+                        <id>get-the-git-infos</id>
+                        <goals>
+                            <goal>revision</goal>
+                        </goals>
+                        <phase>initialize</phase>
+                    </execution>
+                </executions>
+                <configuration>
+                    <generateGitPropertiesFile>true</generateGitPropertiesFile>
+                    <includeOnlyProperties>
+                        <includeOnlyProperty>^git.commit.id.abbrev$</includeOnlyProperty>
+                    </includeOnlyProperties>
+                    <failOnNoGitDirectory>false</failOnNoGitDirectory>
+                </configuration>
+            </plugin>
+            
+            <!-- 资源过滤，注入版本信息 -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-resources-plugin</artifactId>
+                <configuration>
+                    <encoding>UTF-8</encoding>
+                    <useDefaultDelimiters>false</useDefaultDelimiters>
+                    <delimiters>
+                        <delimiter>@</delimiter>
+                    </delimiters>
                 </configuration>
             </plugin>
         </plugins>
