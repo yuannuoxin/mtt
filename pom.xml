@@ -36,6 +36,9 @@
         
         <!-- Knife4j (Swagger 增强) -->
         <knife4j.version>4.4.0</knife4j.version>
+        
+        <!-- Maven 构建时间格式 -->
+        <maven.build.timestamp.format>yyyyMMdd-HHmmss</maven.build.timestamp.format>
     </properties>
 
     <!-- 依赖管理 -->

@@ -105,8 +105,8 @@
     </dependencies>
 
     <build>
-        <!-- 设置最终 JAR 包名称，包含 Git Commit ID -->
-        <finalName>${project.artifactId}-${project.version}-${git.commit.id.abbrev}</finalName>
+        <!-- 设置最终 JAR 包名称，包含 Git Commit ID、分支名称和构建时间 -->
+        <finalName>${project.artifactId}-${project.version}-${git.branch}-${git.commit.id.abbrev}-${maven.build.timestamp}</finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -172,6 +172,7 @@
                     <generateGitPropertiesFile>true</generateGitPropertiesFile>
                     <includeOnlyProperties>
                         <includeOnlyProperty>^git.commit.id.abbrev$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.branch$</includeOnlyProperty>
                     </includeOnlyProperties>
                     <failOnNoGitDirectory>false</failOnNoGitDirectory>
                 </configuration>

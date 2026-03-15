@@ -16,10 +16,10 @@ FROM eclipse-temurin:17-jdk-alpine
 
 WORKDIR /app
 
-# 只复制打包好的 JAR 文件
-COPY --from=0 /build/demo/target/demo-*.jar ./app.jar
+# 只复制打包好的 JAR 文件（保留原始文件名）
+COPY --from=0 /build/demo/target/*.jar /app/
 
 # 运行应用
 EXPOSE 8080
 
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+CMD java -jar /app/*.jar
