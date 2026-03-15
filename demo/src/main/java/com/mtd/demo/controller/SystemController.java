@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.Serializable;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.time.*;
+import java.util.Date;
 
 /**
  * 系统信息控制器
@@ -147,6 +151,92 @@ public class SystemController {
     }
 
     /**
+     * 日期类型响应对象
+     */
+    @Data
+    public static class DateTypesResponse implements Serializable {
+        /**
+         * java.util.Date
+         */
+        private Date utilDate;
+
+        /**
+         * java.sql.Date
+         */
+        private Date sqlDate;
+
+        /**
+         * java.sql.Timestamp
+         */
+        private Timestamp timestamp;
+
+        /**
+         * java.sql.Time
+         */
+        private Time time;
+
+        /**
+         * LocalDate (yyyy-MM-dd)
+         */
+        private LocalDate localDate;
+
+        /**
+         * LocalTime (HH:mm:ss)
+         */
+        private LocalTime localTime;
+
+        /**
+         * LocalDateTime (yyyy-MM-dd HH:mm:ss)
+         */
+        private LocalDateTime localDateTime;
+
+        /**
+         * Instant (时间戳)
+         */
+        private Instant instant;
+
+        /**
+         * ZonedDateTime (带时区的时间)
+         */
+        private ZonedDateTime zonedDateTime;
+
+        /**
+         * OffsetDateTime (带偏移量的时间)
+         */
+        private OffsetDateTime offsetDateTime;
+
+        /**
+         * YearMonth (年月)
+         */
+        private YearMonth yearMonth;
+
+        /**
+         * MonthDay (月日)
+         */
+        private MonthDay monthDay;
+
+        /**
+         * Year (年)
+         */
+        private Year year;
+
+        /**
+         * Hutool DateTime
+         */
+        private DateTime hutoolDateTime;
+
+        /**
+         * 毫秒时间戳 (System.currentTimeMillis)
+         */
+        private Long currentTimeMillis;
+
+        /**
+         * 纳秒时间戳 (System.nanoTime)
+         */
+        private Long nanoTime;
+    }
+
+    /**
      * 获取 JAR 包名称
      *
      * @return JAR 包名称
@@ -252,5 +342,64 @@ public class SystemController {
             info.setJarName("Unknown");
             return info;
         }
+    }
+
+    @Operation(summary = "获取所有常见日期类型", description = "返回各种常用的日期时间类型示例")
+    @PostMapping("/date-types")
+    public Result<DateTypesResponse> getAllDateTypes() {
+        DateTypesResponse response = new DateTypesResponse();
+        
+        // 当前时刻作为基准时间
+        long nowMillis = System.currentTimeMillis();
+        
+        // java.util.Date
+        response.setUtilDate(new Date(nowMillis));
+        
+        // java.sql.Date (只包含日期部分)
+        response.setSqlDate(new Date(nowMillis));
+        
+        // java.sql.Timestamp (精确到纳秒)
+        response.setTimestamp(new Timestamp(nowMillis));
+        
+        // java.sql.Time (只包含时间部分)
+        response.setTime(new Time(nowMillis));
+        
+        // Java 8+ LocalDate
+        response.setLocalDate(LocalDate.now());
+        
+        // Java 8+ LocalTime
+        response.setLocalTime(LocalTime.now());
+        
+        // Java 8+ LocalDateTime
+        response.setLocalDateTime(LocalDateTime.now());
+        
+        // Java 8+ Instant (时间戳)
+        response.setInstant(Instant.now());
+        
+        // Java 8+ ZonedDateTime (系统默认时区)
+        response.setZonedDateTime(ZonedDateTime.now());
+        
+        // Java 8+ OffsetDateTime
+        response.setOffsetDateTime(OffsetDateTime.now());
+        
+        // Java 8+ YearMonth
+        response.setYearMonth(YearMonth.now());
+        
+        // Java 8+ MonthDay
+        response.setMonthDay(MonthDay.now());
+        
+        // Java 8+ Year
+        response.setYear(Year.now());
+        
+        // Hutool DateTime
+        response.setHutoolDateTime(DateUtil.date());
+        
+        // 毫秒时间戳
+        response.setCurrentTimeMillis(System.currentTimeMillis());
+        
+        // 纳秒时间戳
+        response.setNanoTime(System.nanoTime());
+        
+        return Result.success(response);
     }
 }
