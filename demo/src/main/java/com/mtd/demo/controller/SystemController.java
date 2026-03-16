@@ -36,6 +36,10 @@ public class SystemController {
     private String projectVersion = "unknown";
     private String springBootVersion = "unknown";
     private String springCloudVersion = "unknown";
+    private String buildTime = "unknown";
+    private String gitBranch = "unknown";
+    private String gitCommitId = "unknown";
+    private String gitCommitTime = "unknown";
 
     public SystemController() {
         try {
@@ -46,6 +50,10 @@ public class SystemController {
                 this.projectVersion = props.getProperty("project.version", "unknown");
                 this.springBootVersion = props.getProperty("spring-boot.version", "unknown");
                 this.springCloudVersion = props.getProperty("spring-cloud.version", "unknown");
+                this.buildTime = props.getProperty("build.time", "unknown");
+                this.gitBranch = props.getProperty("git.branch", "unknown");
+                this.gitCommitId = props.getProperty("git.commit.id", "unknown");
+                this.gitCommitTime = props.getProperty("git.commit.time", "unknown");
             }
         } catch (Exception e) {
             log.warn("Failed to load version.properties", e);
@@ -399,6 +407,50 @@ public class SystemController {
         
         // 纳秒时间戳
         response.setNanoTime(System.nanoTime());
+        
+        return Result.success(response);
+    }
+
+    /**
+     * Git 和构建信息响应对象
+     */
+    @Data
+    public static class GitBuildInfoResponse implements Serializable {
+        /**
+         * Git 分支名称
+         */
+        private String gitBranch;
+
+        /**
+         * Git 提交 ID（完整）
+         */
+        private String gitCommitId;
+
+        /**
+         * Git 提交时间
+         */
+        private String gitCommitTime;
+
+        /**
+         * 打包构建时间
+         */
+        private String buildTime;
+
+        /**
+         * 项目版本
+         */
+        private String projectVersion;
+    }
+
+    @Operation(summary = "获取 Git 和构建信息", description = "获取当前版本的 Git 分支、提交时间、提交 ID 以及打包时间等信息")
+    @PostMapping("/git-build-info")
+    public Result<GitBuildInfoResponse> getGitBuildInfo() {
+        GitBuildInfoResponse response = new GitBuildInfoResponse();
+        response.setGitBranch(gitBranch);
+        response.setGitCommitId(gitCommitId);
+        response.setGitCommitTime(gitCommitTime);
+        response.setBuildTime(buildTime);
+        response.setProjectVersion(projectVersion);
         
         return Result.success(response);
     }

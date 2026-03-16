@@ -171,8 +171,10 @@
                 <configuration>
                     <generateGitPropertiesFile>true</generateGitPropertiesFile>
                     <includeOnlyProperties>
+                        <includeOnlyProperty>^git.commit.id$</includeOnlyProperty>
                         <includeOnlyProperty>^git.commit.id.abbrev$</includeOnlyProperty>
                         <includeOnlyProperty>^git.branch$</includeOnlyProperty>
+                        <includeOnlyProperty>^git.commit.time$</includeOnlyProperty>
                     </includeOnlyProperties>
                     <failOnNoGitDirectory>false</failOnNoGitDirectory>
                 </configuration>
