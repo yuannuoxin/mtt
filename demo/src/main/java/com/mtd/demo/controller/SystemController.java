@@ -15,6 +15,10 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.Serializable;
+import java.sql.Time;
+import java.sql.Timestamp;
+import java.time.*;
+import java.util.Date;
 
 /**
  * 系统信息控制器
@@ -32,6 +36,10 @@ public class SystemController {
     private String projectVersion = "unknown";
     private String springBootVersion = "unknown";
     private String springCloudVersion = "unknown";
+    private String buildTime = "unknown";
+    private String gitBranch = "unknown";
+    private String gitCommitId = "unknown";
+    private String gitCommitTime = "unknown";
 
     public SystemController() {
         try {
@@ -42,6 +50,10 @@ public class SystemController {
                 this.projectVersion = props.getProperty("project.version", "unknown");
                 this.springBootVersion = props.getProperty("spring-boot.version", "unknown");
                 this.springCloudVersion = props.getProperty("spring-cloud.version", "unknown");
+                this.buildTime = props.getProperty("build.time", "unknown");
+                this.gitBranch = props.getProperty("git.branch", "unknown");
+                this.gitCommitId = props.getProperty("git.commit.id", "unknown");
+                this.gitCommitTime = props.getProperty("git.commit.time", "unknown");
             }
         } catch (Exception e) {
             log.warn("Failed to load version.properties", e);
@@ -144,6 +156,92 @@ public class SystemController {
         private String jarName;
         private String jarPathRaw;
         private String jarPathDecoded;
+    }
+
+    /**
+     * 日期类型响应对象
+     */
+    @Data
+    public static class DateTypesResponse implements Serializable {
+        /**
+         * java.util.Date
+         */
+        private Date utilDate;
+
+        /**
+         * java.sql.Date
+         */
+        private Date sqlDate;
+
+        /**
+         * java.sql.Timestamp
+         */
+        private Timestamp timestamp;
+
+        /**
+         * java.sql.Time
+         */
+        private Time time;
+
+        /**
+         * LocalDate (yyyy-MM-dd)
+         */
+        private LocalDate localDate;
+
+        /**
+         * LocalTime (HH:mm:ss)
+         */
+        private LocalTime localTime;
+
+        /**
+         * LocalDateTime (yyyy-MM-dd HH:mm:ss)
+         */
+        private LocalDateTime localDateTime;
+
+        /**
+         * Instant (时间戳)
+         */
+        private Instant instant;
+
+        /**
+         * ZonedDateTime (带时区的时间)
+         */
+        private ZonedDateTime zonedDateTime;
+
+        /**
+         * OffsetDateTime (带偏移量的时间)
+         */
+        private OffsetDateTime offsetDateTime;
+
+        /**
+         * YearMonth (年月)
+         */
+        private YearMonth yearMonth;
+
+        /**
+         * MonthDay (月日)
+         */
+        private MonthDay monthDay;
+
+        /**
+         * Year (年)
+         */
+        private Year year;
+
+        /**
+         * Hutool DateTime
+         */
+        private DateTime hutoolDateTime;
+
+        /**
+         * 毫秒时间戳 (System.currentTimeMillis)
+         */
+        private Long currentTimeMillis;
+
+        /**
+         * 纳秒时间戳 (System.nanoTime)
+         */
+        private Long nanoTime;
     }
 
     /**
@@ -252,5 +350,108 @@ public class SystemController {
             info.setJarName("Unknown");
             return info;
         }
+    }
+
+    @Operation(summary = "获取所有常见日期类型", description = "返回各种常用的日期时间类型示例")
+    @PostMapping("/date-types")
+    public Result<DateTypesResponse> getAllDateTypes() {
+        DateTypesResponse response = new DateTypesResponse();
+        
+        // 当前时刻作为基准时间
+        long nowMillis = System.currentTimeMillis();
+        
+        // java.util.Date
+        response.setUtilDate(new Date(nowMillis));
+        
+        // java.sql.Date (只包含日期部分)
+        response.setSqlDate(new Date(nowMillis));
+        
+        // java.sql.Timestamp (精确到纳秒)
+        response.setTimestamp(new Timestamp(nowMillis));
+        
+        // java.sql.Time (只包含时间部分)
+        response.setTime(new Time(nowMillis));
+        
+        // Java 8+ LocalDate
+        response.setLocalDate(LocalDate.now());
+        
+        // Java 8+ LocalTime
+        response.setLocalTime(LocalTime.now());
+        
+        // Java 8+ LocalDateTime
+        response.setLocalDateTime(LocalDateTime.now());
+        
+        // Java 8+ Instant (时间戳)
+        response.setInstant(Instant.now());
+        
+        // Java 8+ ZonedDateTime (系统默认时区)
+        response.setZonedDateTime(ZonedDateTime.now());
+        
+        // Java 8+ OffsetDateTime
+        response.setOffsetDateTime(OffsetDateTime.now());
+        
+        // Java 8+ YearMonth
+        response.setYearMonth(YearMonth.now());
+        
+        // Java 8+ MonthDay
+        response.setMonthDay(MonthDay.now());
+        
+        // Java 8+ Year
+        response.setYear(Year.now());
+        
+        // Hutool DateTime
+        response.setHutoolDateTime(DateUtil.date());
+        
+        // 毫秒时间戳
+        response.setCurrentTimeMillis(System.currentTimeMillis());
+        
+        // 纳秒时间戳
+        response.setNanoTime(System.nanoTime());
+        
+        return Result.success(response);
+    }
+
+    /**
+     * Git 和构建信息响应对象
+     */
+    @Data
+    public static class GitBuildInfoResponse implements Serializable {
+        /**
+         * Git 分支名称
+         */
+        private String gitBranch;
+
+        /**
+         * Git 提交 ID（完整）
+         */
+        private String gitCommitId;
+
+        /**
+         * Git 提交时间
+         */
+        private String gitCommitTime;
+
+        /**
+         * 打包构建时间
+         */
+        private String buildTime;
+
+        /**
+         * 项目版本
+         */
+        private String projectVersion;
+    }
+
+    @Operation(summary = "获取 Git 和构建信息", description = "获取当前版本的 Git 分支、提交时间、提交 ID 以及打包时间等信息")
+    @PostMapping("/git-build-info")
+    public Result<GitBuildInfoResponse> getGitBuildInfo() {
+        GitBuildInfoResponse response = new GitBuildInfoResponse();
+        response.setGitBranch(gitBranch);
+        response.setGitCommitId(gitCommitId);
+        response.setGitCommitTime(gitCommitTime);
+        response.setBuildTime(buildTime);
+        response.setProjectVersion(projectVersion);
+        
+        return Result.success(response);
     }
 }
