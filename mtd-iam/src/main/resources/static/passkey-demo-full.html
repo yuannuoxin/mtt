@@ -253,11 +253,6 @@
             if (hostname === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
                 return hostname;
             }
-            // 否则返回域名（不包括子域名）
-            const parts = hostname.split('.');
-            if (parts.length >= 2) {
-                return parts.slice(-2).join('.');
-            }
             return hostname;
         }
 
@@ -313,10 +308,7 @@
                 logoutBtn.classList.remove('hidden');
                 registerBtn.disabled = false;
                 refreshBtn.disabled = false;
-                
-                // 保存 token
-                currentToken = userInfo?.token;
-                localStorage.setItem('passkey_token', currentToken);
+
             } else {
                 statusEl.textContent = '未登录';
                 statusEl.className = 'login-status logged-out';
