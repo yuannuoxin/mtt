@@ -151,11 +151,19 @@
                 <artifactId>mtd-common-redis</artifactId>
                 <version>1.0.0-SNAPSHOT</version>
             </dependency>
+            
+            <!-- MTD IAM Module -->
+            <dependency>
+                <groupId>com.mtd</groupId>
+                <artifactId>mtd-iam</artifactId>
+                <version>1.0.0-SNAPSHOT</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
     <modules>
         <module>mtd-common</module>
         <module>demo</module>
+        <module>mtd-iam</module>
     </modules>
 </project>

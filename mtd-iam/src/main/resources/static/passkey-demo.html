@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<meta charset="UTF-8">
+<title>Passkey 最终版</title>
+
+<button onclick="registerPasskey()">注册 Passkey</button>
+<button onclick="loginPasskey()">登录 Passkey</button>
+
+    <script>
+        function toBase64Url(buffer) {
+            return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        function fromBase64Url(str) {
+            str = str.replace(/-/g, '+').replace(/_/g, '/');
+            while (str.length % 4) str += '=';
+            return Uint8Array.from(atob(str), c => c.charCodeAt(0));
+        }
+
+        // 注册
+        async function registerPasskey() {
+            const opt = await fetch('/passkeyTest/register/options').then(r => r.json());
+            const pk = await navigator.credentials.create({
+                publicKey: {
+                    challenge: fromBase64Url(opt.challenge),
+                    rp: { id: opt.rpId, name: opt.rpName },
+                    user: {
+                        id: fromBase64Url(opt.userId),
+                        name: opt.userName,
+                        displayName: opt.userDisplayName
+                    },
+                    pubKeyCredParams: [{ type: 'public-key', alg: -7 }],
+                    authenticatorSelection: { userVerification: 'preferred' }
+                }
+            });
+
+            const body = {
+                credentialId: toBase64Url(pk.rawId),
+                publicKey: toBase64Url(pk.response.getPublicKey()), // 正确
+                clientDataJSON: toBase64Url(pk.response.clientDataJSON),
+                authenticatorData: toBase64Url(pk.response.authenticatorData),
+                transports: (pk.response.transports || []).join(',')
+            };
+
+            await fetch('/passkeyTest/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).then(r => r.json());
+
+            alert('注册成功！');
+        }
+
+        // 登录
+        async function loginPasskey() {
+            const opt = await fetch('/passkeyTest/login/options').then(r => r.json());
+            const assertion = await navigator.credentials.get({
+                publicKey: {
+                    challenge: fromBase64Url(opt.challenge),
+                    rpId: opt.rpId,
+                    userVerification: 'preferred'
+                }
+            });
+
+            const body = {
+                credentialId: toBase64Url(assertion.rawId),
+                clientDataJSON: toBase64Url(assertion.response.clientDataJSON),
+                authenticatorData: toBase64Url(assertion.response.authenticatorData),
+                signature: toBase64Url(assertion.response.signature)
+            };
+
+            const res = await fetch('/passkeyTest/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            }).then(r => r.json());
+
+            alert('登录成功：token=' + res.token);
+        }
+    </script>

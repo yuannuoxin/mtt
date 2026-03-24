@@ -93,4 +93,4 @@ logs/
 .swp
 .swo
 *~
-/demo/src/main/resources/application-local.yml
+**/application-local.yml
