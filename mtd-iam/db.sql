@@ -43,7 +43,7 @@ CREATE TABLE `iam_user_contact`
     `contact`      varchar(128) NOT NULL,
     -- 手机号专用：国家区号
     `country_code` varchar(10)           DEFAULT NULL COMMENT '国家区号 如 +86 / +1 / +44 / +852',
-    `primary`      tinyint      NOT NULL DEFAULT 0 COMMENT '1主账号 0辅助',
+    `major`      tinyint      NOT NULL DEFAULT 0 COMMENT '1主账号 0辅助',
     `verified`     tinyint      NOT NULL DEFAULT 0 COMMENT '是否验证',
     `status`       tinyint      NOT NULL DEFAULT 1,
     `create_time`  datetime              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -114,6 +114,7 @@ CREATE TABLE `iam_user_verify_code`
 (
     `id`          bigint       NOT NULL AUTO_INCREMENT,
     `receive`     varchar(128) NOT NULL COMMENT '手机号/邮箱',
+    `country_code` varchar(10)           DEFAULT NULL COMMENT '国家区号 如 +86 / +1 / +44 / +852',
     `code`        varchar(16)  NOT NULL,
     `type`        varchar(20)  NOT NULL COMMENT 'sms/email',
     `scene`       varchar(32)  NOT NULL COMMENT 'login/register/reset_pwd/bind',

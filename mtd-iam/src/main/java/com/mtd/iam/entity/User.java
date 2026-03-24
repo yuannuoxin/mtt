@@ -20,7 +20,7 @@ public class User extends BaseEntity {
     private String nickname;
     private String avatar;
     /**
-     * 状态: 1正常 2禁用 3注销
+     * 状态: 1正常 0禁用 3注销
      */
     private Integer status;
 }

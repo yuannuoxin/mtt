@@ -19,6 +19,8 @@ public class UserVerifyCode extends BaseEntity {
      * 手机号/邮箱
      */
     private String receive;
+
+    private String countryCode;
     /**
      * 验证码
      */

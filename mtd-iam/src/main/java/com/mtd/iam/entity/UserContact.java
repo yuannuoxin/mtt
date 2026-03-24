@@ -28,7 +28,7 @@ public class UserContact extends BaseEntity {
     /**
      * 是否主账号：1-主账号 0-辅助
      */
-    private Integer primary;
+    private Integer major;
     /**
      * 是否验证：0-未验证 1-已验证
      */
