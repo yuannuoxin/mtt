@@ -1,0 +1,644 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Passkey 认证演示</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 800px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 32px;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .status-bar {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .login-status {
+            font-weight: bold;
+        }
+
+        .login-status.logged-in {
+            color: #27ae60;
+        }
+
+        .login-status.logged-out {
+            color: #e74c3c;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #229954;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c0392b;
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 24px;
+        }
+
+        .passkey-list {
+            list-style: none;
+            margin-top: 15px;
+        }
+
+        .passkey-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .passkey-info {
+            flex: 1;
+        }
+
+        .passkey-device {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .passkey-credential {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+
+        .message {
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+
+        .message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Passkey 认证演示</h1>
+        <p class="subtitle">使用 WebAuthn 标准实现无密码认证</p>
+
+        <!-- 状态栏 -->
+        <div class="status-bar">
+            <div>
+                <span id="loginStatus" class="login-status logged-out">未登录</span>
+                <span id="userInfo" class="hidden"></span>
+            </div>
+            <button id="logoutBtn" class="btn btn-danger hidden" onclick="logout()">退出登录</button>
+        </div>
+
+        <!-- 注册区域 -->
+        <div class="section">
+            <h2>📝 添加 Passkey</h2>
+            <p style="color: #666; margin-bottom: 15px;">需要先登录才能添加 Passkey</p>
+            <button id="registerBtn" class="btn btn-primary" onclick="registerPasskey()" disabled>
+                添加 Passkey
+            </button>
+            <div id="registerMessage" class="message"></div>
+        </div>
+
+        <!-- 登录区域 -->
+        <div class="section">
+            <h2>🔑 Passkey 登录</h2>
+            <p style="color: #666; margin-bottom: 15px;">使用已注册的 Passkey 进行登录</p>
+            <button id="loginBtn" class="btn btn-success" onclick="loginPasskey()">
+                使用 Passkey 登录
+            </button>
+            <div id="loginMessage" class="message"></div>
+        </div>
+
+        <!-- Passkey 列表区域 -->
+        <div class="section">
+            <h2>📱 我的设备</h2>
+            <button id="refreshBtn" class="btn btn-primary" onclick="loadPasskeys()" disabled>
+                刷新列表
+            </button>
+            <ul id="passkeyList" class="passkey-list">
+                <li style="color: #999; padding: 20px; text-align: center;">暂无设备信息</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/auth/passkey';
+        let currentToken = null;
+        
+        // 自动获取当前网站的域名作为 RpId
+        function getRpId() {
+            const hostname = window.location.hostname;
+            const port = window.location.port;
+            // 如果是 localhost 或 IP 地址，直接返回
+            if (hostname === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+                return hostname;
+            }
+            // 否则返回域名（不包括子域名）
+            const parts = hostname.split('.');
+            if (parts.length >= 2) {
+                return parts.slice(-2).join('.');
+            }
+            return hostname;
+        }
+
+        // Cookie 工具函数
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) return parts.pop().split(';').shift();
+            return null;
+        }
+
+        // Base64 工具函数
+        function toBase64Url(buffer) {
+            return btoa(String.fromCharCode(...new Uint8Array(buffer)))
+                .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        function fromBase64Url(str) {
+            str = str.replace(/-/g, '+').replace(/_/g, '/');
+            while (str.length % 4) str += '=';
+            return Uint8Array.from(atob(str), c => c.charCodeAt(0));
+        }
+
+        // 显示消息
+        function showMessage(elementId, message, type = 'info') {
+            const el = document.getElementById(elementId);
+            el.textContent = message;
+            el.className = `message ${type}`;
+            el.style.display = 'block';
+            
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 5000);
+        }
+
+        // 更新登录状态
+        function updateLoginStatus(loggedIn, userInfo = null) {
+            const statusEl = document.getElementById('loginStatus');
+            const infoEl = document.getElementById('userInfo');
+            const logoutBtn = document.getElementById('logoutBtn');
+            const registerBtn = document.getElementById('registerBtn');
+            const refreshBtn = document.getElementById('refreshBtn');
+
+            if (loggedIn) {
+                statusEl.textContent = '已登录';
+                statusEl.className = 'login-status logged-in';
+                
+                if (userInfo) {
+                    infoEl.textContent = `${userInfo.nickname} (${userInfo.username})`;
+                    infoEl.classList.remove('hidden');
+                }
+                
+                logoutBtn.classList.remove('hidden');
+                registerBtn.disabled = false;
+                refreshBtn.disabled = false;
+                
+                // 保存 token
+                currentToken = userInfo?.token;
+                localStorage.setItem('passkey_token', currentToken);
+            } else {
+                statusEl.textContent = '未登录';
+                statusEl.className = 'login-status logged-out';
+                infoEl.classList.add('hidden');
+                logoutBtn.classList.add('hidden');
+                registerBtn.disabled = true;
+                refreshBtn.disabled = true;
+                currentToken = null;
+                localStorage.removeItem('passkey_token');
+            }
+        }
+
+        // 检查是否已登录（从 Cookie 或 localStorage 获取 Token）
+        async function checkLoginStatus() {
+            // 优先从 Cookie 获取 Token
+            const cookieToken = getCookie('Authorization');
+            const savedToken = localStorage.getItem('passkey_token');
+            
+            const token = cookieToken || savedToken;
+            
+            if (token) {
+                console.log('发现已保存的 token:', token);
+                currentToken = token;
+                
+                // 获取用户信息
+                try {
+                    await loadUserInfo();
+                } catch (error) {
+                    console.error('获取用户信息失败:', error);
+                    localStorage.removeItem('passkey_token');
+                }
+            }
+        }
+
+        // 获取用户信息
+        async function loadUserInfo() {
+            try {
+                const res = await fetch('/login/userInfo', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await res.json();
+                
+                if (result.code === 200) {
+                    updateLoginStatus(true, result.data);
+                } else {
+                    throw new Error(result.msg || '获取用户信息失败');
+                }
+            } catch (error) {
+                console.error('获取用户信息失败:', error);
+                throw error;
+            }
+        }
+
+        // 注册 Passkey
+        async function registerPasskey() {
+            const btn = document.getElementById('registerBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> 注册中...';
+
+            try {
+                // 步骤 1: 获取注册挑战值
+                const challengeRes = await fetch(`${API_BASE}/register/challenge`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ 
+                        rpId: getRpId()  // 传递 RpId
+                    })
+                });
+
+                const challengeData = await challengeRes.json();
+                
+                if (!challengeData.success && challengeData.code !== 200) {
+                    throw new Error(challengeData.msg || '获取挑战值失败');
+                }
+
+                const opt = challengeData.data;
+
+                // 使用自动获取的 RpId
+                const rpId = getRpId();
+
+                // 步骤 2: 调用浏览器 WebAuthn API 创建凭证
+                const credential = await navigator.credentials.create({
+                    publicKey: {
+                        challenge: fromBase64Url(opt.challenge),
+                        rp: { 
+                            id: rpId, 
+                            name: document.title || 'MTD IAM' 
+                        },
+                        user: {
+                            id: fromBase64Url(opt.userId),
+                            name: opt.userName,
+                            displayName: opt.userDisplayName
+                        },
+                        pubKeyCredParams: [
+                            { type: 'public-key', alg: -7 },  // ES256
+                            { type: 'public-key', alg: -257 } // RS256
+                        ],
+                        authenticatorSelection: { 
+                            authenticatorAttachment: 'platform',
+                            userVerification: 'preferred',
+                            requireResidentKey: false
+                        },
+                        timeout: 60000
+                    }
+                });
+
+                // 步骤 3: 发送凭证信息到服务器
+                const registerData = {
+                    credentialId: toBase64Url(credential.rawId),
+                    publicKey: toBase64Url(credential.response.getPublicKey()),
+                    clientDataJSON: toBase64Url(credential.response.clientDataJSON),
+                    authenticatorData: toBase64Url(credential.response.authenticatorData),
+                    deviceName: navigator.userAgent.includes('Windows') ? 'Windows 设备' : 
+                               navigator.userAgent.includes('Mac') ? 'Mac 设备' : '移动设备',
+                    transports: (credential.response.transports || []).join(','),
+                    rpId: rpId  // 传递 RpId
+                };
+
+                const registerRes = await fetch(`${API_BASE}/register/complete`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(registerData)
+                });
+
+                const registerResult = await registerRes.json();
+
+                if (registerResult.code === 200) {
+                    showMessage('registerMessage', '✅ Passkey 添加成功！', 'success');
+                    loadPasskeys(); // 刷新列表
+                } else {
+                    throw new Error(registerResult.msg || '注册失败');
+                }
+
+            } catch (error) {
+                console.error('注册失败:', error);
+                if (error.name === 'NotAllowedError') {
+                    showMessage('registerMessage', '❌ 您取消了操作', 'error');
+                } else if (error.name === 'NotSupportedError') {
+                    showMessage('registerMessage', '❌ 浏览器不支持 Passkey', 'error');
+                } else {
+                    showMessage('registerMessage', '❌ ' + error.message, 'error');
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '添加 Passkey';
+            }
+        }
+
+        // 使用 Passkey 登录
+        async function loginPasskey() {
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="loading"></span> 登录中...';
+
+            try {
+                // 步骤 1: 获取登录挑战值
+                const challengeRes = await fetch(`${API_BASE}/login/challenge`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rpId: getRpId() })  // 传递 RpId
+                });
+
+                const challengeData = await challengeRes.json();
+                
+                if (!challengeData.success && challengeData.code !== 200) {
+                    throw new Error(challengeData.msg || '获取挑战值失败');
+                }
+
+                const opt = challengeData.data;
+
+                // 使用自动获取的 RpId
+                const rpId = getRpId();
+
+                // 步骤 2: 调用浏览器 WebAuthn API 进行认证
+                const assertion = await navigator.credentials.get({
+                    publicKey: {
+                        challenge: fromBase64Url(opt.challenge),
+                        rpId: rpId,
+                        userVerification: 'preferred',
+                        timeout: 60000
+                    }
+                });
+
+                // 步骤 3: 发送认证信息到服务器
+                const loginData = {
+                    credentialId: toBase64Url(assertion.rawId),
+                    clientDataJSON: toBase64Url(assertion.response.clientDataJSON),
+                    authenticatorData: toBase64Url(assertion.response.authenticatorData),
+                    signature: toBase64Url(assertion.response.signature),
+                    rpId: rpId  // 传递 RpId
+                };
+
+                const loginRes = await fetch(`${API_BASE}/login/complete`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(loginData)
+                });
+
+                const loginResult = await loginRes.json();
+
+                if (loginResult.code === 200) {
+                    showMessage('loginMessage', '✅ 登录成功！', 'success');
+                    // 保存 token
+                    currentToken = loginResult.data.tokenValue;
+                    localStorage.setItem('passkey_token', currentToken);
+                    // 获取用户信息
+                    await loadUserInfo();
+                    loadPasskeys(); // 加载 Passkey 列表
+                } else {
+                    throw new Error(loginResult.msg || '登录失败');
+                }
+
+            } catch (error) {
+                console.error('登录失败:', error);
+                if (error.name === 'NotAllowedError') {
+                    showMessage('loginMessage', '❌ 您取消了操作', 'error');
+                } else if (error.name === 'NotSupportedError') {
+                    showMessage('loginMessage', '❌ 浏览器不支持 Passkey', 'error');
+                } else {
+                    showMessage('loginMessage', '❌ ' + error.message, 'error');
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '使用 Passkey 登录';
+            }
+        }
+
+        // 加载 Passkey 列表
+        async function loadPasskeys() {
+            try {
+                const res = await fetch(`${API_BASE}/list`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await res.json();
+
+                if (result.code === 200) {
+                    const listEl = document.getElementById('passkeyList');
+                    const passkeys = result.data.passkeys || [];
+
+                    if (passkeys.length === 0) {
+                        listEl.innerHTML = '<li style="color: #999; padding: 20px; text-align: center;">暂无设备</li>';
+                    } else {
+                        listEl.innerHTML = passkeys.map(pk => `
+                            <li class="passkey-item">
+                                <div class="passkey-info">
+                                    <div class="passkey-device">📱 ${pk.deviceName || '未知设备'}</div>
+                                    <div class="passkey-credential">ID: ${pk.credentialId.substring(0, 20)}...</div>
+                                    <div class="passkey-credential">添加时间：${new Date(pk.createTime).toLocaleString()}</div>
+                                </div>
+                                <button class="btn btn-danger" onclick="deletePasskey('${pk.credentialId}')">删除</button>
+                            </li>
+                        `).join('');
+                    }
+                } else {
+                    throw new Error(result.msg || '加载失败');
+                }
+            } catch (error) {
+                console.error('加载失败:', error);
+                showMessage('registerMessage', '❌ 加载设备列表失败：' + error.message, 'error');
+            }
+        }
+
+        // 删除 Passkey
+        async function deletePasskey(credentialId) {
+            if (!confirm('确定要删除这个 Passkey 吗？')) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/delete`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ credentialId })
+                });
+
+                const result = await res.json();
+
+                if (result.code === 200) {
+                    showMessage('registerMessage', '✅ 删除成功', 'success');
+                    loadPasskeys();
+                } else {
+                    throw new Error(result.msg || '删除失败');
+                }
+            } catch (error) {
+                console.error('删除失败:', error);
+                showMessage('registerMessage', '❌ 删除失败：' + error.message, 'error');
+            }
+        }
+
+        // 退出登录
+        function logout() {
+            currentToken = null;
+            localStorage.removeItem('passkey_token');
+            updateLoginStatus(false);
+            document.getElementById('passkeyList').innerHTML = '<li style="color: #999; padding: 20px; text-align: center;">请先登录</li>';
+            showMessage('loginMessage', '已退出登录', 'info');
+        }
+
+        // 页面加载时检查登录状态
+        window.addEventListener('DOMContentLoaded', () => {
+            checkLoginStatus();
+            
+            // 检查浏览器是否支持 WebAuthn
+            if (!window.PublicKeyCredential) {
+                showMessage('registerMessage', '⚠️ 您的浏览器不支持 WebAuthn/Passkey，请使用 Chrome、Edge、Firefox 或 Safari 等现代浏览器', 'error');
+                showMessage('loginMessage', '⚠️ 您的浏览器不支持 WebAuthn/Passkey', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
