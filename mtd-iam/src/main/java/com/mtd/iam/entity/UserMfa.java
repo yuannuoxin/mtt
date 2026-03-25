@@ -11,6 +11,10 @@ import lombok.experimental.FieldNameConstants;
 @TableName("iam_user_mfa")
 @FieldNameConstants
 public class UserMfa extends BaseEntity {
+    
+    private Long userId;
+    
     private String secret;
+    
     private Integer status;
 }
