@@ -12,5 +12,6 @@ import lombok.experimental.FieldNameConstants;
 @TableName("iam_user_credential")
 @FieldNameConstants
 public class UserCredential extends BaseEntity {
+    private Long userId;
     private String password;
 }

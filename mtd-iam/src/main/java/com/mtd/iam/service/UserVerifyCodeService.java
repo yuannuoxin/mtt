@@ -70,6 +70,7 @@ public class UserVerifyCodeService extends ServiceImpl<UserVerifyCodeMapper, Use
         }
         if (ObjUtil.notEqual(verifyCode.getCode(), code) ||
                 ObjUtil.notEqual(verifyCode.getReceive(), receive) ||
+                ObjUtil.notEqual(verifyCode.getScene(), scene) ||
                 ObjUtil.notEqual(verifyCode.getCountryCode(), countryCode)) {
             return false;
         }
@@ -84,7 +85,9 @@ public class UserVerifyCodeService extends ServiceImpl<UserVerifyCodeMapper, Use
         if (verifyCode == null) {
             return false;
         }
-        if (ObjUtil.notEqual(verifyCode.getCode(), code) || ObjUtil.notEqual(verifyCode.getReceive(), receive)) {
+        if (ObjUtil.notEqual(verifyCode.getCode(), code) ||
+                ObjUtil.notEqual(verifyCode.getReceive(), receive) ||
+                ObjUtil.notEqual(verifyCode.getScene(), scene)) {
             return false;
         }
 
@@ -100,5 +103,20 @@ public class UserVerifyCodeService extends ServiceImpl<UserVerifyCodeMapper, Use
         }
         verifyCode.setUsed(verifyCode.getUsed() + 1);
         userVerifyCodeMapper.updateById(verifyCode);
+    }
+
+    public boolean verifyLoginCode(Long id, String code, String scene) {
+        UserVerifyCode verifyCode = userVerifyCodeMapper.selectById(id);
+
+        if (verifyCode == null) {
+            return false;
+        }
+        if (ObjUtil.notEqual(verifyCode.getCode(), code) ||
+                ObjUtil.notEqual(verifyCode.getScene(), scene)) {
+            return false;
+        }
+
+        // 检查验证码是否过期（假设验证码 5 分钟有效期）
+        return Duration.between(verifyCode.getCreateTime(), LocalDateTime.now()).toMinutes() < 5;
     }
 }

@@ -10,6 +10,7 @@ import com.mtd.iam.constant.StrConstant;
 import com.mtd.iam.entity.User;
 import com.mtd.iam.entity.UserContact;
 import com.mtd.iam.enums.VerifyCodeEnum;
+import com.mtd.iam.enums.VerifyCodeSceneEnum;
 import com.mtd.iam.enums.YesEnum;
 import com.mtd.iam.mapper.UserContactMapper;
 import com.mtd.iam.mapper.UserMapper;
@@ -19,7 +20,6 @@ import com.mtd.iam.service.UserVerifyCodeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -54,7 +54,7 @@ public class RegisterController {
         log.info("收到邮箱注册请求，邮箱：{}", req.getEmail());
 
         // 1. 验证验证码
-        boolean codeValid = userVerifyCodeService.verifyCode(req.getVerifyId(), req.getEmail(), req.getCode(), req.getCode());
+        boolean codeValid = userVerifyCodeService.verifyCode(req.getVerifyId(), req.getEmail(), req.getCode(), VerifyCodeSceneEnum.REGISTER.getCode());
         if (!codeValid) {
             return Result.error("验证码错误或已过期");
         }
@@ -75,8 +75,6 @@ public class RegisterController {
 
         // 3. 创建用户
         User user = new User();
-        //todo 用户名
-        user.setUsername(req.getEmail());
         String nickname = StrUtil.subBefore(req.getEmail(), "@", false);
         user.setNickname(nickname);
         user.setStatus(YesEnum.YES.getCode()); // 正常状态
@@ -87,7 +85,7 @@ public class RegisterController {
         // 5. 创建联系方式
         UserContact contact = new UserContact();
         contact.setUserId(user.getId());
-        contact.setContactType("email");
+        contact.setContactType(VerifyCodeEnum.EMAIL.getCode());
         contact.setContact(req.getEmail());
         contact.setMajor(YesEnum.YES.getCode()); // 主账号
         contact.setVerified(YesEnum.YES.getCode()); // 已验证
@@ -116,7 +114,7 @@ public class RegisterController {
         log.info("收到手机号注册请求，手机号：{}", req.getPhone());
 
         // 1. 验证验证码
-        boolean codeValid = userVerifyCodeService.verifySmsCode(req.getVerifyId(), req.getCountryCode(), req.getPhone(), req.getCode(), req.getCode());
+        boolean codeValid = userVerifyCodeService.verifySmsCode(req.getVerifyId(), req.getCountryCode(), req.getPhone(), req.getCode(), VerifyCodeSceneEnum.REGISTER.getCode());
         if (!codeValid) {
             return Result.error("验证码错误或已过期");
         }
@@ -138,8 +136,6 @@ public class RegisterController {
 
         // 3. 创建用户
         User user = new User();
-        //todo 用户名
-        user.setUsername(StrUtil.emptyToDefault(req.getCountryCode(), StringUtils.EMPTY) + StrUtil.emptyToDefault(req.getPhone(), StringUtils.EMPTY));
         String nickname = DesensitizedUtil.mobilePhone(req.getPhone());
         user.setNickname(nickname);
         user.setStatus(YesEnum.YES.getCode()); // 正常状态
@@ -150,7 +146,7 @@ public class RegisterController {
         // 5. 创建联系方式
         UserContact contact = new UserContact();
         contact.setUserId(user.getId());
-        contact.setContactType("sms");
+        contact.setContactType(VerifyCodeEnum.SMS.getCode());
         contact.setCountryCode(req.getCountryCode());
         contact.setContact(req.getPhone());
         contact.setMajor(YesEnum.YES.getCode()); // 主账号

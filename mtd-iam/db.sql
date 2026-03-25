@@ -24,7 +24,8 @@ CREATE TABLE `iam_user`
 
 CREATE TABLE `iam_user_credential`
 (
-    `id`          bigint       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+    `id`          bigint       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    `user_id`     bigint       NOT NULL,
     `password`    varchar(128) NOT NULL COMMENT 'bcrypt/argon2加密密码',
     `create_time` datetime DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
     `update_time` datetime DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
@@ -43,7 +44,7 @@ CREATE TABLE `iam_user_contact`
     `contact`      varchar(128) NOT NULL,
     -- 手机号专用：国家区号
     `country_code` varchar(10)           DEFAULT NULL COMMENT '国家区号 如 +86 / +1 / +44 / +852',
-    `major`      tinyint      NOT NULL DEFAULT 0 COMMENT '1主账号 0辅助',
+    `major`        tinyint      NOT NULL DEFAULT 0 COMMENT '1主账号 0辅助',
     `verified`     tinyint      NOT NULL DEFAULT 0 COMMENT '是否验证',
     `status`       tinyint      NOT NULL DEFAULT 1,
     `create_time`  datetime              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -112,20 +113,20 @@ CREATE TABLE `iam_user_auth_third`
 
 CREATE TABLE `iam_user_verify_code`
 (
-    `id`          bigint       NOT NULL AUTO_INCREMENT,
-    `receive`     varchar(128) NOT NULL COMMENT '手机号/邮箱',
+    `id`           bigint       NOT NULL AUTO_INCREMENT,
+    `receive`      varchar(128) NOT NULL COMMENT '手机号/邮箱',
     `country_code` varchar(10)           DEFAULT NULL COMMENT '国家区号 如 +86 / +1 / +44 / +852',
-    `code`        varchar(16)  NOT NULL,
-    `type`        varchar(20)  NOT NULL COMMENT 'sms/email',
-    `scene`       varchar(32)  NOT NULL COMMENT 'login/register/reset_pwd/bind',
-    `used`        tinyint      NOT NULL DEFAULT 0,
-    `create_time` datetime              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    `update_time` datetime              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-    `create_by`   bigint(20) DEFAULT NULL COMMENT '创建人 ID',
-    `update_by`   bigint(20) DEFAULT NULL COMMENT '更新人 ID',
-    `deleted`     int(11) DEFAULT '0' COMMENT '逻辑删除 0-未删除 1-已删除',
+    `code`         varchar(16)  NOT NULL,
+    `type`         varchar(20)  NOT NULL COMMENT 'sms/email',
+    `scene`        varchar(32)  NOT NULL COMMENT 'login/register/reset_pwd/bind',
+    `used`         tinyint      NOT NULL DEFAULT 0,
+    `create_time`  datetime              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    `update_time`  datetime              DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+    `create_by`    bigint(20) DEFAULT NULL COMMENT '创建人 ID',
+    `update_by`    bigint(20) DEFAULT NULL COMMENT '更新人 ID',
+    `deleted`      int(11) DEFAULT '0' COMMENT '逻辑删除 0-未删除 1-已删除',
     PRIMARY KEY (`id`),
-    KEY           `idx_receive` (`receive`)
+    KEY            `idx_receive` (`receive`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='短信/邮箱验证码';
 
 CREATE TABLE `iam_user_access_log`

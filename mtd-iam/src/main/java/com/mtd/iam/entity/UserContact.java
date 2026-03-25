@@ -14,7 +14,7 @@ public class UserContact extends BaseEntity {
 
     private Long userId;
     /**
-     * 联系类型：phone/email
+     * 联系类型：sms/email
      */
     private String contactType;
     /**

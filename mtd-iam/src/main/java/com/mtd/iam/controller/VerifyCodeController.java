@@ -27,7 +27,7 @@ public class VerifyCodeController {
      * 发送验证码接口
      */
     @Operation(summary = "发送验证码", description = "发送短信或邮箱验证码")
-    @PostMapping("/verify-code/send")
+    @PostMapping("/sendVerifyCode")
     public Result<SendVerifyCodeResp> sendVerifyCode(@RequestBody SendVerifyCodeRequest req) {
         log.info("收到发送验证码请求，类型：{}, 场景：{}, 接收者：{}", req.getType(), req.getScene(), req.getReceive());
 
