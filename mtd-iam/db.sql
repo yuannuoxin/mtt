@@ -59,7 +59,8 @@ CREATE TABLE `iam_user_contact`
 
 CREATE TABLE `iam_user_mfa`
 (
-    `id`          bigint       NOT NULL AUTO_INCREMENT COMMENT '用户ID',
+    `id`          bigint       NOT NULL AUTO_INCREMENT COMMENT 'ID',
+    `user_id`      bigint       NOT NULL,
     `secret`      varchar(128) NOT NULL COMMENT 'TOTP密钥',
     `status`      tinyint      NOT NULL DEFAULT 0 COMMENT '0关闭 1开启',
     `create_time` datetime              DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
@@ -68,7 +69,7 @@ CREATE TABLE `iam_user_mfa`
     `update_by`   bigint(20) DEFAULT NULL COMMENT '更新人 ID',
     `deleted`     int(11) DEFAULT '0' COMMENT '逻辑删除 0-未删除 1-已删除',
     PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='TOTP多因素认证（一人一个）';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='TOTP多因素认证';
 
 
 CREATE TABLE `iam_user_passkey`
