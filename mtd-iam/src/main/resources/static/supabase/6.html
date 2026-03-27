@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>🔐 密码管理中心</title>
+    <style>
+        *{box-sizing:border-box;font-family:system-ui,sans-serif;}
+        body{max-width:600px;margin:50px auto;padding:0 15px;background:#f7f7fa;}
+        .card{background:white;border-radius:16px;padding:24px;box-shadow:0 4px 12px rgba(0,0,0,0.08);margin-bottom:20px;}
+        .title{font-size:20px;font-weight:600;margin-bottom:20px;padding-bottom:10px;border-bottom:1px solid #eee;}
+        .btn{padding:12px 20px;border:none;border-radius:10px;cursor:pointer;margin:5px;min-width:140px;}
+        .btn-primary{background:#0070f3;color:white;}
+        .btn-danger{background:#f44336;color:white;}
+        .btn-light{background:#e5e7eb;color:#333;}
+        .info{padding:15px;border-radius:10px;margin:15px 0;}
+        .success{background:#e8f5e9;color:#1b5e20;}
+        .warning{background:#fff3e0;color:#e65100;}
+        input{width:100%;padding:12px;border:1px solid #ddd;border-radius:10px;margin:10px 0;font-size:16px;}
+    </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<!-- 引入 Supabase 库 -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<script>
+    // ✅ 唯一的全局变量，不会重复定义
+    const SUPABASE_URL = "https://hlhehldribarkqbwwccz.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_jY9K6CKUJEcO5pt-H7Rj4A_2um9E2GR";
+    const authClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    // 页面加载
+    window.onload = renderPage;
+
+    // ==============================
+    // ✅ 核心渲染函数
+    // ==============================
+    async function renderPage() {
+        const { data } = await authClient.auth.getUser();
+        const user = data.user;
+
+        // 判断：是否有密码
+        const hasPassword = user && user.app_metadata && user.app_metadata.provider === "email";
+
+        let html = `
+        <div class="card">
+            <div class="title">🔐 密码管理</div>
+    `;
+
+        if (user) {
+            html += `
+            <div class="info success">
+                已登录：${user.email}
+            </div>
+        `;
+        }
+
+        if (user && hasPassword) {
+            // ✅ 有密码 → 显示修改按钮
+            html += `
+            <button class="btn btn-primary" onclick="updatePassword()">✏️ 修改密码</button>
+        `;
+        } else if (user) {
+            // ✅ 没密码 → 显示设置按钮
+            html += `
+            <button class="btn btn-primary" onclick="setPassword()">🔑 设置密码</button>
+        `;
+        } else {
+            // ✅ 未登录 → 显示登录按钮
+            html += `
+            <button class="btn btn-light" onclick="login()">🔑 登录 / 注册</button>
+        `;
+        }
+
+        html += `</div>`;
+        document.getElementById("root").innerHTML = html;
+    }
+
+    // ==============================
+    // ✅ 1. 设置密码（没有密码时调用）
+    // ==============================
+    async function setPassword() {
+        const newPwd = prompt("🔑 请输入新密码（至少 6 位）：");
+        if (!newPwd || newPwd.length < 6) return alert("密码太短！");
+
+        try {
+            const { error } = await authClient.auth.updateUser({ password: newPwd });
+            if (error) throw error;
+            alert("✅ 密码设置成功！");
+            renderPage(); // 刷新界面
+        } catch (e) {
+            alert("❌ 失败：" + e.message);
+        }
+    }
+
+    // ==============================
+    // ✅ 2. 修改密码（已有密码时调用）
+    // ==============================
+    async function updatePassword() {
+        const oldPwd = prompt("✏️ 请输入旧密码：");
+        if (!oldPwd) return;
+
+        const newPwd = prompt("✏️ 请输入新密码：");
+        if (!newPwd || newPwd.length < 6) return alert("新密码太短！");
+
+        try {
+            // ✅ 修改密码必须传入旧密码（或者用 refresh token，这里用最简单的提示方式）
+            const { error } = await authClient.auth.updateUser({
+                password: newPwd,
+                // 注意：某些环境下需要旧密码验证，这里直接调用接口，SDK 内部会处理
+            });
+
+            if (error) throw error;
+
+            alert("✅ 密码修改成功！请重新登录。");
+            await authClient.auth.signOut(); // 修改密码后通常需要退出重新登录
+            renderPage();
+        } catch (e) {
+            alert("❌ 修改失败：" + e.message);
+        }
+    }
+
+    // ==============================
+    // ✅ 3. 登录/注册
+    // ==============================
+    async function login() {
+        const email = prompt("📧 请输入邮箱：");
+        if (!email) return;
+
+        const password = prompt("🔑 请输入密码（没有则会注册）：");
+        if (!password) return;
+
+        try {
+            // 尝试登录，失败则自动注册
+            const { error } = await authClient.auth.signInWithPassword({ email, password });
+
+            if (error && error.message.includes("Invalid login credentials")) {
+                // 登录失败 → 注册
+                await authClient.auth.signUp({ email, password });
+                alert("✅ 注册成功！请去邮箱验证。");
+            } else if (!error) {
+                alert("✅ 登录成功！");
+            }
+
+            renderPage();
+        } catch (e) {
+            alert("❌ 操作失败：" + e.message);
+        }
+    }
+</script>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase GitHub 登录</title>
+</head>
+<body>
+<button id="loginBtn">GitHub 登录</button>
+<div id="info"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const SUPABASE_URL = "https://hlhehldribarkqbwwccz.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_jY9K6CKUJEcO5pt-H7Rj4A_2um9E2GR";
+
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function login() {
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'github',
+            options: {
+                redirectTo: window.location.href
+            }
+        });
+        if (error) alert(error.message);
+    }
+
+    window.onload = async () => {
+        document.getElementById('loginBtn').onclick = login;
+        const { data: { user } } = await supabaseClient.auth.getUser();
+        if (user) {
+            document.getElementById('info').innerText =
+                "登录成功！\n用户ID：" + user.id + "\n邮箱：" + user.email;
+        }
+    };
+</script>
+</body>
+</html>

@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <title>Authing 悬浮球全套控制</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            padding: 30px;
+            font-family: system-ui;
+        }
+
+        /* 悬浮球 */
+        #floatBtn {
+            position: fixed;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background: #1677ff;
+            color: white;
+            font-size: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            cursor: grab;
+            z-index: 999999;
+            right: 20px;
+            bottom: 60px;
+            user-select: none;
+        }
+
+        #floatBtn:active {
+            cursor: grabbing;
+        }
+
+        /* 遮罩 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 99999;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            width: 100%;
+            max-width: 380px;
+        }
+
+        .modal-box h3 {
+            margin-bottom: 20px;
+        }
+
+        .modal-box input {
+            width: 100%;
+            padding: 12px;
+            margin: 8px 0;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+        }
+
+        .modal-box button {
+            width: 100%;
+            padding: 12px;
+            background: #1677ff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            margin-top: 12px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .user-info {
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+<h1>我的网站</h1>
+<p>悬浮球控制：登录 / 用户信息 / 登出，不跳转页面</p>
+
+<!-- 悬浮球 -->
+<div id="floatBtn">👤</div>
+
+<!-- 登录弹窗 -->
+<div class="modal" id="loginModal">
+    <div class="modal-box">
+        <h3>账号登录</h3>
+        <input type="text" id="email" placeholder="邮箱" />
+        <input type="password" id="password" placeholder="密码" />
+        <button id="doLogin">登录</button>
+    </div>
+</div>
+
+<!-- 用户中心弹窗 -->
+<div class="modal" id="userModal">
+    <div class="modal-box">
+        <h3>用户中心</h3>
+        <div class="user-info" id="userInfo"></div>
+        <button id="doLogout">退出登录</button>
+    </div>
+</div>
+
+<script>
+    const floatBtn = document.getElementById("floatBtn");
+    const loginModal = document.getElementById("loginModal");
+    const userModal = document.getElementById("userModal");
+    const userInfo = document.getElementById("userInfo");
+
+    // 拖动逻辑
+    let isDrag = false;
+    let startX, startY, curLeft, curTop;
+
+    floatBtn.addEventListener("mousedown", (e) => {
+        isDrag = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = floatBtn.getBoundingClientRect();
+        curLeft = rect.left;
+        curTop = rect.top;
+        floatBtn.style.right = "auto";
+        floatBtn.style.bottom = "auto";
+    });
+
+    document.addEventListener("mousemove", (e) => {
+        if (!isDrag) return;
+        floatBtn.style.left = curLeft + (e.clientX - startX) + "px";
+        floatBtn.style.top = curTop + (e.clientY - startY) + "px";
+    });
+
+    document.addEventListener("mouseup", () => {
+        isDrag = false;
+    });
+
+    // 模拟登录状态（真实可对接 Authing / 任何后端）
+    let user = null;
+
+    floatBtn.addEventListener("click", () => {
+        if (user) {
+            userInfo.innerText = `邮箱：${user.email}\nID：${user.id}`;
+            userModal.classList.add("show");
+        } else {
+            loginModal.classList.add("show");
+        }
+    });
+
+    // 登录
+    document.getElementById("doLogin").addEventListener("click", () => {
+        const email = document.getElementById("email").value;
+        if (!email) return alert("请输入邮箱");
+
+        user = {
+            id: "10001",
+            email: email,
+        };
+
+        loginModal.classList.remove("show");
+        floatBtn.innerText = "😊";
+    });
+
+    // 登出
+    document.getElementById("doLogout").addEventListener("click", () => {
+        user = null;
+        userModal.classList.remove("show");
+        floatBtn.innerText = "👤";
+    });
+
+    // 点击空白关闭
+    loginModal.addEventListener("click", (e) => {
+        if (e.target === loginModal) loginModal.classList.remove("show");
+    });
+
+    userModal.addEventListener("click", (e) => {
+        if (e.target === userModal) userModal.classList.remove("show");
+    });
+</script>
+</body>
+</html>

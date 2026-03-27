@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Firebase 悬浮球登录</title>
+    <style>
+        /* --- 悬浮球按钮样式 --- */
+        #floating-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: #1976d2;
+            color: white;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+            z-index: 1000;
+        }
+
+        /* --- 登录弹窗样式 --- */
+        #login-popup {
+            display: none; /* 默认隐藏 */
+            position: fixed;
+            bottom: 90px;
+            right: 20px;
+            width: 320px;
+            background: white;
+            border-radius: 8px;
+            padding: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            z-index: 999;
+            border: 1px solid #ddd;
+        }
+    </style>
+    <!-- 1. 引入 CSS -->
+    <link type="text/css" rel="stylesheet" href="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui.css" />
+</head>
+<body>
+
+<!-- 悬浮球按钮 -->
+<button id="floating-btn">👤</button>
+
+<!-- 登录框容器 -->
+<div id="login-popup">
+    <div id="firebaseui-auth-container"></div>
+</div>
+
+<!-- 2. 引入 JS 库 (使用模块化写法) -->
+<script type="module">
+    // 引入 Firebase 核心功能和认证功能
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAuth, EmailAuthProvider, GoogleAuthProvider } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+
+    // 你的配置
+    const firebaseConfig = {
+        apiKey: "AIzaSyDFgAj-VmVbMhwBNMRT_vgzkX-RQNSErVU",
+        authDomain: "fir-sso-44876.firebaseapp.com",
+        projectId: "fir-sso-44876",
+        storageBucket: "fir-sso-44876.firebasestorage.app",
+        messagingSenderId: "382144651485",
+        appId: "1:382144651485:web:8c0c0813fdb1cfa2987b34",
+        measurementId: "G-HCXP3H0FP7"
+    };
+
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+
+    // --- 悬浮球交互逻辑 ---
+    const btn = document.getElementById('floating-btn');
+    const popup = document.getElementById('login-popup');
+
+    btn.onclick = () => {
+        if (popup.style.display === 'block') {
+            popup.style.display = 'none';
+        } else {
+            popup.style.display = 'block';
+        }
+    };
+
+    // --- 启动 FirebaseUI ---
+    const uiConfig = {
+        signInSuccessUrl: '/',
+        signInOptions: [
+            // 这里配置你在控制台开启的方式
+            {
+                provider: 'password', // 邮箱密码登录
+            },
+            {
+                provider: 'google.com', // Google 登录
+            }
+        ],
+    };
+
+    // 这里的 firebaseui 是全局变量，由下面的 script 标签加载
+    // 等待 DOM 加载完成
+    document.addEventListener('DOMContentLoaded', () => {
+        // 这里的 firebaseui 是由下面的 <script src="...firebase-ui.js"> 注入到全局的
+        if (typeof firebaseui !== 'undefined') {
+            const ui = new firebaseui.auth.AuthUI(auth);
+            ui.start('#firebaseui-auth-container', uiConfig);
+        } else {
+            console.error("FirebaseUI 库加载失败");
+        }
+    });
+</script>
+
+<!-- 3. 引入 FirebaseUI JS (必须放在最后，且不需要 type="module") -->
+<script src="https://www.gstatic.com/firebasejs/ui/6.0.1/firebase-ui.js"></script>
+
+</body>
+</html>

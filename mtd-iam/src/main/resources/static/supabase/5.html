@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>邮箱管理</title>
+    <style>
+        *{box-sizing:border-box;font-family:system-ui,sans-serif;}
+        body{max-width:700px;margin:30px auto;padding:0 15px;background:#f7f7fa;}
+        .card{background:white;border-radius:16px;padding:24px;margin-bottom:16px;box-shadow:0 2px 10px rgba(0,0,0,0.05);}
+        .title{font-size:18px;font-weight:600;margin-bottom:15px;}
+        .info{padding:12px;border-radius:10px;margin:10px 0;}
+        .success{background:#e8f5e9;color:#1b5e20;}
+        .warning{background:#fff3e0;color:#e65100;}
+        .btn{padding:12px 20px;border:none;border-radius:10px;cursor:pointer;margin:5px 0;}
+        .btn-primary{background:#0070f3;color:white;}
+        .btn-danger{background:#f44336;color:white;}
+    </style>
+</head>
+<body>
+
+<div id="root"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    // 只定义 1 次，全局唯一
+    const SUPABASE_URL = "https://hlhehldribarkqbwwccz.supabase.co";
+    const SUPABASE_KEY = "sb_publishable_jY9K6CKUJEcO5pt-H7Rj4A_2um9E2GR";
+
+    // 用一个全新名字，绝对不重复
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+    window.onload = async () => {
+        const { data } = await sb.auth.getUser();
+        const user = data.user;
+
+        document.getElementById("root").innerHTML = `
+    <div class="card">
+      <div class="title">📧 邮箱状态</div>
+      <div class="info success">当前邮箱：${user.email}</div>
+      ${user.new_email ? `
+        <div class="info warning">
+          待确认新邮箱：${user.new_email}
+        </div>
+      ` : ''}
+    </div>
+
+    <div class="card">
+      <button class="btn btn-primary" onclick="resend()">重新发送验证邮件</button>
+      <button class="btn btn-danger" onclick="cancel()">取消邮箱修改</button>
+    </div>
+  `;
+    };
+
+    // 重发邮件
+    async function resend() {
+        const e = prompt("输入新邮箱：");
+        if(e) await sb.auth.updateUser({ email: e });
+        location.reload();
+    }
+
+    // 取消修改
+    async function cancel() {
+        await sb.auth.updateUser({ email_change_token: "" });
+        location.reload();
+    }
+</script>
+</body>
+</html>

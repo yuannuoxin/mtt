@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>谷歌账号登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: #f7f8fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        .logo {
+            width: 60px;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        /* 谷歌登录按钮样式 */
+        .google-btn {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: 0.2s;
+            margin-bottom: 20px;
+        }
+
+        .google-btn:hover {
+            background: #f8f9fa;
+            border-color: #ccc;
+        }
+
+        .google-icon {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* 退出按钮 */
+        .logout-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #ff4444;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .logout-btn:hover {
+            background: #cc0000;
+        }
+
+        /* 用户信息 */
+        .user-info {
+            text-align: center;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+
+        .user-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin-bottom: 15px;
+            object-fit: cover;
+        }
+
+        .user-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 5px;
+        }
+
+        .user-email {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        /* 隐藏样式 */
+        .hidden {
+            display: none !important;
+        }
+
+        /* 错误提示 */
+        .error {
+            color: #ff4444;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <!-- 登录前界面 -->
+    <div id="loginSection">
+        <h2>谷歌账号登录</h2>
+        <p>使用您的谷歌账号一键安全登录</p>
+        <div id="error" class="error"></div>
+        <button class="google-btn" onclick="googleLogin()">
+            <img class="google-icon" src="https://ssl.gstatic.com/ui/v1/icons/mail/rfr/logo_gmail_lockup_default_1x_r5.png" alt="谷歌">
+            使用谷歌账号登录
+        </button>
+    </div>
+
+    <!-- 登录后界面 -->
+    <div id="userSection" class="hidden">
+        <div class="user-info">
+            <img id="userAvatar" class="user-avatar" alt="头像">
+            <div id="userName" class="user-name"></div>
+            <div id="userEmail" class="user-email"></div>
+        </div>
+        <button class="logout-btn" onclick="logout()">退出登录</button>
+    </div>
+</div>
+
+<script type="module">
+    // 导入 Firebase 依赖
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-analytics.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+    // 你的 Firebase 配置
+    const firebaseConfig = {
+        apiKey: "AIzaSyDFgAj-VmVbMhwBNMRT_vgzkX-RQNSErVU",
+        authDomain: "fir-sso-44876.firebaseapp.com",
+        projectId: "fir-sso-44876",
+        storageBucket: "fir-sso-44876.firebasestorage.app",
+        messagingSenderId: "382144651485",
+        appId: "1:382144651485:web:8c0c0813fdb1cfa2987b34",
+        measurementId: "G-HCXP3H0FP7"
+    };
+
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    // 工具：显示错误
+    function showError(msg) {
+        document.getElementById('error').textContent = msg;
+    }
+
+    // 1. 谷歌登录（弹窗模式）
+    window.googleLogin = async () => {
+        try {
+            const result = await signInWithPopup(auth, provider);
+            console.log(result);
+            showError('');
+        } catch (error) {
+            showError('登录失败：' + error.message);
+            console.error(error);
+        }
+    };
+
+    // 2. 退出登录
+    window.logout = async () => {
+        try {
+            await signOut(auth);
+            showError('');
+        } catch (error) {
+            showError('退出失败');
+        }
+    };
+
+    // 3. 监听登录状态（自动切换界面）
+    onAuthStateChanged(auth, (user) => {
+        const loginSection = document.getElementById('loginSection');
+        const userSection = document.getElementById('userSection');
+
+        if (user) {
+            // 已登录：显示用户信息
+            loginSection.classList.add('hidden');
+            userSection.classList.remove('hidden');
+
+            // 填充用户数据
+            document.getElementById('userAvatar').src = user.photoURL;
+            document.getElementById('userName').textContent = user.displayName;
+            document.getElementById('userEmail').textContent = user.email;
+        } else {
+            // 未登录：显示登录按钮
+            loginSection.classList.remove('hidden');
+            userSection.classList.add('hidden');
+        }
+    });
+</script>
+
+</body>
+</html>

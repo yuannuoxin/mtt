@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>Supabase 登录 + 完整公钥 + 验签</title>
+</head>
+<body>
+<button id="loginBtn">GitHub 登录</button>
+<div id="info" style="white-space:pre-wrap;margin-top:20px"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+    const SUPABASE_URL = "https://hlhehldribarkqbwwccz.supabase.co";
+    const SUPABASE_ANON_KEY = "sb_publishable_jY9K6CKUJEcO5pt-H7Rj4A_2um9E2GR";
+    const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    // GitHub 登录
+    async function login() {
+        const { error } = await supabaseClient.auth.signInWithOAuth({
+            provider: 'github',
+            options: { redirectTo: window.location.href }
+        });
+        if (error) alert(error.message);
+    }
+
+    // 页面加载
+    window.onload = async () => {
+        document.getElementById('loginBtn').onclick = login;
+        const info = document.getElementById('info');
+        const { data } = await supabaseClient.auth.getSession();
+        const session = data.session;
+
+        if (!session) {
+            info.innerText = "未登录，请点击登录";
+            return;
+        }
+
+        const token = session.access_token;
+        const user = session.user;
+        let result = "验签中...";
+        let publicKeyInfo = "";
+        let fullPublicKeyBase64 = "";
+
+        try {
+            // 1. 拆分 Token
+            const [h, p, s] = token.split(".");
+            const data = new TextEncoder().encode(h + "." + p);
+
+            // 2. 从官方获取 JWKS
+            const jwks = await fetch(SUPABASE_URL + "/auth/v1/.well-known/jwks.json").then(res => res.json());
+            const key = jwks.keys[0];
+
+            // 3. 获取 x y
+            const xBytes = base64UrlToBytes(key.x);
+            const yBytes = base64UrlToBytes(key.y);
+
+            // 4. 拼接完整原生公钥 0x04 + x + y
+            const rawPublicKey = new Uint8Array([0x04, ...xBytes, ...yBytes]);
+
+            // 5. 转成 Base64（完整公钥）
+            fullPublicKeyBase64 = bytesToBase64(rawPublicKey);
+
+            // 6. 导入公钥并验签
+            const pubKey = await crypto.subtle.importKey(
+                "raw", rawPublicKey,
+                { name: "ECDSA", namedCurve: "P-256" },
+                false, ["verify"]
+            );
+
+            const signature = base64UrlToBytes(s);
+            const valid = await crypto.subtle.verify(
+                { name: "ECDSA", hash: "SHA-256" }, pubKey, signature, data
+            );
+
+            result = valid ? "✅ 验签成功！" : "❌ 验签失败：无效签名";
+
+            // 公钥信息展示
+            publicKeyInfo = `
+x: ${key.x}
+y: ${key.y}
+完整公钥（Base64）：
+${fullPublicKeyBase64}
+`;
+
+        } catch (e) {
+            result = "❌ 验签失败：" + e.message;
+        }
+
+        // 输出到页面
+        info.innerText = `
+=== 登录成功 ===
+用户ID：${user.id}
+邮箱：${user.email}
+
+=== Access Token ===
+${token}
+
+=== 公钥信息 ===
+${publicKeyInfo}
+
+=== 验签结果 ===
+${result}
+`;
+    };
+
+    // ========== 工具方法 ==========
+    function base64UrlToBytes(str) {
+        str = str.replaceAll("-", "+").replaceAll("_", "/");
+        while (str.length % 4) str += "=";
+        return Uint8Array.from(atob(str), c => c.charCodeAt(0));
+    }
+
+    function bytesToBase64(bytes) {
+        return btoa(String.fromCharCode(...bytes));
+    }
+</script>
+</body>
+</html>

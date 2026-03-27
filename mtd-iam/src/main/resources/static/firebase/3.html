@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>谷歌账号登录</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        body {
+            background: #f7f8fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .card {
+            background: white;
+            padding: 40px 30px;
+            border-radius: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        p {
+            color: #666;
+            margin-bottom: 30px;
+        }
+
+        .google-btn {
+            width: 100%;
+            padding: 14px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background: white;
+            font-size: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: 0.2s;
+            margin-bottom: 20px;
+        }
+
+        .google-btn:hover {
+            background: #f8f9fa;
+        }
+
+        .logout-btn {
+            width: 100%;
+            padding: 14px;
+            border: none;
+            border-radius: 8px;
+            background: #ff4444;
+            color: white;
+            font-size: 16px;
+            cursor: pointer;
+        }
+
+        .user-info {
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            text-align: left;
+            word-break: break-all;
+        }
+
+        .user-avatar {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            margin-bottom: 15px;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .error {
+            color: #ff4444;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .token-box {
+            background: #f1f1f1;
+            padding: 10px;
+            border-radius: 6px;
+            font-size: 12px;
+            max-height: 150px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+
+<body>
+<div class="card">
+    <div id="loginSection">
+        <h2>谷歌账号登录</h2>
+        <p>点击按钮一键登录</p>
+        <div id="error" class="error"></div>
+        <button class="google-btn" id="loginBtn">使用谷歌账号登录</button>
+    </div>
+
+    <div id="userSection" class="hidden">
+        <div class="user-info">
+            <img id="userAvatar" class="user-avatar"><br>
+            <strong>姓名：</strong><span id="userName"></span><br>
+            <strong>邮箱：</strong><span id="userEmail"></span><br>
+            <strong>UID：</strong><span id="userId"></span><br>
+            <br>
+            <strong>ID Token：</strong>
+            <div id="token" class="token-box"></div>
+        </div>
+        <button class="logout-btn" onclick="logout()">退出登录</button>
+    </div>
+</div>
+
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.11.0/firebase-auth.js";
+
+    const firebaseConfig = {
+        apiKey: "AIzaSyDFgAj-VmVbMhwBNMRT_vgzkX-RQNSErVU",
+        authDomain: "fir-sso-44876.firebaseapp.com",
+        projectId: "fir-sso-44876",
+        storageBucket: "fir-sso-44876.firebasestorage.app",
+        messagingSenderId: "382144651485",
+        appId: "1:382144651485:web:8c0c0813fdb1cfa2987b34",
+        measurementId: "G-HCXP3H0FP7"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    // 显示错误
+    function showError(msg) {
+        document.getElementById('error').textContent = msg;
+    }
+
+    // 谷歌登录（修复重复触发问题）
+    let isLoggingIn = false;
+    window.googleLogin = async () => {
+        if (isLoggingIn) return;
+        isLoggingIn = true;
+        showError('');
+
+        try {
+            const result = await signInWithPopup(auth, provider);
+            const user = result.user;
+            console.log("登录成功", user);
+        } catch (err) {
+            if (err.code !== 'auth/popup-closed-by-user' && err.code !== 'auth/cancelled-popup-request') {
+                showError("登录失败：" + err.message);
+            }
+        } finally {
+            isLoggingIn = false;
+        }
+    };
+
+    document.getElementById('loginBtn').addEventListener('click', googleLogin);
+
+    // 退出登录
+    window.logout = async () => {
+        await signOut(auth);
+        showError('');
+    };
+
+    // 监听登录状态（确保一定会刷新界面）
+    onAuthStateChanged(auth, async (user) => {
+        const loginSection = document.getElementById('loginSection');
+        const userSection = document.getElementById('userSection');
+
+        if (user) {
+            loginSection.classList.add('hidden');
+            userSection.classList.remove('hidden');
+
+            const token = await user.getIdToken();
+            document.getElementById('userAvatar').src = user.photoURL || '';
+            document.getElementById('userName').textContent = user.displayName || '未知';
+            document.getElementById('userEmail').textContent = user.email || '无';
+            document.getElementById('userId').textContent = user.uid;
+            document.getElementById('token').textContent = token;
+        } else {
+            loginSection.classList.remove('hidden');
+            userSection.classList.add('hidden');
+        }
+    });
+</script>
+</body>
+</html>
