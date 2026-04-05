@@ -1,9 +1,16 @@
 package com.mtd.demo.controller;
 
+import cn.hutool.core.date.DatePattern;
 import cn.hutool.core.date.DateTime;
 import cn.hutool.core.date.DateUtil;
+import cn.hutool.crypto.digest.DigestUtil;
 import cn.hutool.extra.servlet.JakartaServletUtil;
+import cn.hutool.http.useragent.UserAgent;
+import cn.hutool.http.useragent.UserAgentUtil;
+import cn.hutool.json.JSONUtil;
 import com.mtd.common.core.result.Result;
+import com.mtd.demo.DemoApplication;
+import com.mtd.demo.constant.StrConstant;
 import com.mtd.demo.response.base.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -11,21 +18,24 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.system.ApplicationHome;
+import org.springframework.context.ApplicationContext;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 import java.sql.Time;
 import java.sql.Timestamp;
 import java.time.*;
-import java.util.Date;
-import java.util.Locale;
-import java.util.Map;
-import java.util.TimeZone;
+import java.util.*;
 
 /**
  * 系统信息控制器
@@ -400,5 +410,151 @@ public class SystemController {
         int minutes = Math.abs(offset) % 60;
         String sign = offset >= 0 ? "+" : "-";
         return String.format("GMT%s%02d:%02d", sign, hours, minutes);
+    }
+
+    @Operation(summary = "获取客户端 IP 地址")
+    @GetMapping("/getClientIp")
+    public Result<Map<String, Object>> getClientIp(HttpServletRequest request) {
+        Map<String, Object> resultMap = new HashMap<>();
+        String clientIp = JakartaServletUtil.getClientIP(request);
+        resultMap.put("clientIp", clientIp);
+        return Result.success(resultMap);
+    }
+
+    @Operation(summary = "获取详细 IP 信息")
+    @GetMapping("/getIpDetail")
+    public Result<Map<String, Object>> getIpDetail(HttpServletRequest request) {
+        Map<String, Object> result = new HashMap<>();
+
+        // 获取客户端 IP
+        String clientIp = JakartaServletUtil.getClientIP(request);
+
+        // 获取 User-Agent
+        String userAgentString = JakartaServletUtil.getHeader(request, "User-Agent", StandardCharsets.UTF_8);
+
+        // 获取其他请求头信息
+        String acceptLanguage = request.getHeader("Accept-Language");
+        String acceptEncoding = request.getHeader("Accept-Encoding");
+        String xForwardedFor = request.getHeader("X-Forwarded-For");
+        String xRealIp = request.getHeader("X-Real-IP");
+
+        result.put("clientIp", clientIp);
+        result.put("userAgent", userAgentString);
+        result.put("acceptLanguage", acceptLanguage);
+        result.put("acceptEncoding", acceptEncoding);
+        result.put("xForwardedFor", xForwardedFor);
+        result.put("xRealIp", xRealIp);
+
+        return Result.success(result);
+    }
+
+    //获取请求头
+    @GetMapping("/getAllHeaders")
+    public Object getAllHeaders() {
+        HttpServletRequest request = ((ServletRequestAttributes)
+                RequestContextHolder.currentRequestAttributes()).getRequest();
+
+        Map<String, List<String>> headers = new HashMap<>();
+        Enumeration<String> headerNames = request.getHeaderNames();
+        while (headerNames.hasMoreElements()) {
+            String headerName = headerNames.nextElement();
+            Enumeration<String> headerValues = request.getHeaders(headerName);
+            List<String> values = new ArrayList<>();
+            while (headerValues.hasMoreElements()) {
+                values.add(headerValues.nextElement());
+            }
+            headers.put(headerName, values);
+        }
+
+        return Result.success(headers);
+    }
+
+
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    @GetMapping("/t1")
+    public Object t1() throws Exception {
+        Map<String, Object> map = new HashMap<>();
+
+        ApplicationHome home = new ApplicationHome(DemoApplication.class);
+        map.put("jarName", home.getSource().getName());
+        long startupDate = applicationContext.getStartupDate();
+        map.put("startupDate", DatePattern.NORM_DATETIME_FORMAT.format(startupDate));
+        map.put("uptimeStr", getUptime(applicationContext));
+
+        map.put("date", new Date());
+        map.put("datetime", DateTime.now());
+        map.put("localDateTime", LocalDateTime.now());
+        map.put("localDate", LocalDate.now());
+        map.put("localTime", LocalTime.now());
+        map.put("now", DatePattern.CHINESE_DATE_TIME_FORMAT.format(new Date()));
+        map.put("url", getUrl());
+        HttpServletRequest request = ((ServletRequestAttributes)
+                RequestContextHolder.currentRequestAttributes()).getRequest();
+        map.put("getRequestURI", request.getRequestURI());
+        map.put("getRequestURL", request.getRequestURL());
+        map.put("getContextPath", request.getContextPath());
+        map.put("getServletPath", request.getServletPath());
+        map.put("getQueryString", request.getQueryString());
+
+        String clientIp = JakartaServletUtil.getClientIP(request);
+        String userAgentString = JakartaServletUtil.getHeader(request, StrConstant.USER_AGENT, StandardCharsets.UTF_8);
+        UserAgent userAgent = UserAgentUtil.parse(userAgentString);
+        map.put("clientIp", clientIp);
+        map.put("userAgent", userAgent);
+
+        String acceptLanguage = request.getHeader("Accept-Language");
+        String acceptEncoding = request.getHeader("Accept-Encoding");
+        String acceptCharset = request.getHeader("Accept-Charset");
+        map.put("acceptLanguage", acceptLanguage);
+        map.put("acceptEncoding", acceptEncoding);
+        map.put("acceptCharset", acceptCharset);
+
+        String userAgentStr = request.getHeader(StrConstant.USER_AGENT);
+
+        Map<String, Object> fingerprintMap = new HashMap<>();
+        fingerprintMap.put("userAgent", userAgentStr);
+        fingerprintMap.put("acceptLanguage", acceptLanguage);
+        fingerprintMap.put("acceptEncoding", acceptEncoding);
+        fingerprintMap.put("acceptCharset", acceptCharset);
+        String fingerprintRaw = JSONUtil.toJsonStr(fingerprintMap);
+        map.put("fingerprintSha256Hex", DigestUtil.sha256Hex(fingerprintRaw));
+        map.put("fingerprintMd5", DigestUtil.md5(fingerprintRaw));
+        map.put("fingerprintMd5Hex", DigestUtil.md5Hex(fingerprintRaw));
+
+
+        return Result.success(map);
+    }
+
+    private String getUptime(ApplicationContext context) {
+        // 获取启动时间
+        Instant startupTime = Instant.ofEpochMilli(context.getStartupDate());
+        Instant currentTime = Instant.now();
+
+        // 计算时间差
+        Duration duration = Duration.between(startupTime, currentTime);
+
+        // 转换为天、小时、分钟、秒
+        long days = duration.toDays();
+        long hours = duration.toHours() % 24;
+        long minutes = duration.toMinutes() % 60;
+        long seconds = duration.getSeconds() % 60;
+
+        // 结果
+        String uptimeStr = String.format("Application has been running for: %d 天, %d 小时, %d 分钟, %d 秒%n", days, hours, minutes, seconds);
+        return uptimeStr;
+    }
+
+    public String getUrl() {
+        HttpServletRequest request = ((ServletRequestAttributes)
+                RequestContextHolder.currentRequestAttributes()).getRequest();
+        return getDomain(request);
+    }
+
+    public static String getDomain(HttpServletRequest request) {
+        StringBuffer url = request.getRequestURL();
+        String contextPath = request.getServletContext().getContextPath();
+        return url.delete(url.length() - request.getRequestURI().length(), url.length()).append(contextPath).toString();
     }
 }
