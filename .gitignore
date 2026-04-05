@@ -94,3 +94,4 @@ logs/
 .swo
 *~
 **/application-local.yml
+/tmp/
