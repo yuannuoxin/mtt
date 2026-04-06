@@ -54,3 +54,12 @@ knife4j:
   setting:
     language: zh_cn
     swagger-model-name: 实体类列表
+# 支付宝配置
+alipay:
+  gateway-url: https://openapi.alipay.com/gateway.do
+  app-id: 2021005158609439
+  private-key: "todo"
+  alipay-public-key: "todo"
+  sign-type: RSA2
+  charset: utf-8
+  format: json
