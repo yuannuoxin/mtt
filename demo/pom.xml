@@ -22,35 +22,35 @@
             <groupId>com.mtd</groupId>
             <artifactId>mtd-common-core</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>com.mtd</groupId>
             <artifactId>mtd-common-mybatis</artifactId>
         </dependency>
-        
+
         <dependency>
             <groupId>com.mtd</groupId>
             <artifactId>mtd-common-satoken</artifactId>
         </dependency>
-        
+
         <!-- MTD Common Web -->
         <dependency>
             <groupId>com.mtd</groupId>
             <artifactId>mtd-common-web</artifactId>
         </dependency>
-        
+
         <!-- MTD Common Redis -->
         <dependency>
             <groupId>com.mtd</groupId>
             <artifactId>mtd-common-redis</artifactId>
         </dependency>
-        
+
         <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        
+
         <!-- Spring Boot AOP -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -62,13 +62,13 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
-        
+
         <!-- Knife4j (Swagger 增强) -->
         <dependency>
             <groupId>com.github.xiaoymin</groupId>
             <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
         </dependency>
-        
+
         <!-- PostgreSQL Driver -->
         <dependency>
             <groupId>org.postgresql</groupId>
@@ -82,7 +82,14 @@
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
         </dependency>
-        
+
+        <!-- P6Spy SQL监控 -->
+        <dependency>
+            <groupId>com.github.gavlyukovskiy</groupId>
+            <artifactId>p6spy-spring-boot-starter</artifactId>
+            <version>1.9.0</version>
+        </dependency>
+
         <!-- Hutool 工具类 -->
         <dependency>
             <groupId>cn.hutool</groupId>
@@ -92,7 +99,7 @@
         <dependency>
             <groupId>com.alipay.sdk</groupId>
             <artifactId>alipay-sdk-java</artifactId>
-            <version>4.39.218.ALL</version>
+            <version>4.40.607.ALL</version>
         </dependency>
 
         <!-- Lombok -->
@@ -101,7 +108,7 @@
             <artifactId>lombok</artifactId>
             <scope>provided</scope>
         </dependency>
-        
+
         <!-- Spring Boot Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -112,7 +119,9 @@
 
     <build>
         <!-- 设置最终 JAR 包名称，包含 Git Commit ID、分支名称和构建时间 -->
-        <finalName>${project.artifactId}-${project.version}-${git.branch}-${git.commit.id.abbrev}-${maven.build.timestamp}</finalName>
+        <finalName>
+            ${project.artifactId}-${project.version}-${git.branch}-${git.commit.id.abbrev}-${maven.build.timestamp}
+        </finalName>
         <resources>
             <resource>
                 <directory>src/main/resources</directory>
@@ -139,7 +148,7 @@
                     </excludes>
                 </configuration>
             </plugin>
-            
+
             <!-- Maven 编译器插件 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -159,7 +168,7 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            
+
             <!-- Git Commit ID 插件 -->
             <plugin>
                 <groupId>io.github.git-commit-id</groupId>
@@ -185,7 +194,7 @@
                     <failOnNoGitDirectory>false</failOnNoGitDirectory>
                 </configuration>
             </plugin>
-            
+
             <!-- 资源过滤，注入版本信息 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
