@@ -95,3 +95,4 @@ logs/
 *~
 **/application-local.yml
 /tmp/
+/.idea/

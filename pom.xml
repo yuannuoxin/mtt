@@ -165,5 +165,6 @@
         <module>mtd-common</module>
         <module>demo</module>
         <module>mtd-iam</module>
+        <module>mybatisFlex001</module>
     </modules>
 </project>
