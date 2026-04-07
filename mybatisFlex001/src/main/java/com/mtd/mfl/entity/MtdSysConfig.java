@@ -1,8 +1,10 @@
 package com.mtd.mfl.entity;
 
+import com.mybatisflex.annotation.Column;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 import com.mybatisflex.annotation.Table;
+import com.mybatisflex.core.handler.JacksonTypeHandler;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -40,7 +42,8 @@ public class MtdSysConfig extends MyBaseEntity implements Serializable {
     /**
      * 配置值（支持数字、字符串、复杂JSON）
      */
-    private String jsonVal;
+    @Column(typeHandler = JacksonTypeHandler.class)
+    private Object jsonVal;
 
 
 }

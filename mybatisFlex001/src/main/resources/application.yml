@@ -27,4 +27,10 @@ knife4j:
     language: zh_cn
     swagger-model-name: 实体类列表
 #
+mybatis-flex:
+  configuration:
+    # 关闭二级缓存
+    cache-enabled: false
+    # 关闭一级缓存
+    local-cache-scope: STATEMENT
 
