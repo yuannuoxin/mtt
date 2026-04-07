@@ -91,7 +91,6 @@ public class SysUserController {
 
     @PostMapping("/selectListByMap")
     public Result<List<SysUser>> selectListByMap(@RequestBody Map<String, Object> conditions) {
-        // ✅ Flex 自动解析：key里的 _like / _gt / _gte
         QueryWrapper wrapper = QueryWrapper.create()
                 .where(conditions); // 🔥 核心方法
         return Result.success(sysUserService.list(wrapper));
