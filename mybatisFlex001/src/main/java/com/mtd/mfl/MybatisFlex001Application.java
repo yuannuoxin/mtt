@@ -8,8 +8,7 @@ import org.springframework.context.annotation.ComponentScan;
 @SpringBootApplication
 @ComponentScan(basePackages = {
         "com.mtd.mfl",
-        "com.mtd.common.web",
-        "com.mtd.common.satoken"
+        "com.mtd.common.web"
 })
 public class MybatisFlex001Application {
 

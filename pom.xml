@@ -166,5 +166,6 @@
         <module>demo</module>
         <module>mtd-iam</module>
         <module>mybatisFlex001</module>
+        <module>myJpaQueryDSL</module>
     </modules>
 </project>
