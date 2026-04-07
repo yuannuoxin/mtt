@@ -16,6 +16,7 @@ public class MyInsertListener implements InsertListener {
     @Override
     public void onInsert(Object entity) {
         if (entity instanceof MyBaseEntity) {
+            LocalDateTime now = LocalDateTime.now();
             MyBaseEntity baseEntity = (MyBaseEntity) entity;
             
             if (baseEntity.getCreateBy() == null) {
@@ -24,6 +25,14 @@ public class MyInsertListener implements InsertListener {
             if (baseEntity.getUpdateBy() == null) {
                 baseEntity.setUpdateBy(myUserIdProvider.getUserId());
             }
+
+            if (baseEntity.getCreateTime() == null) {
+                baseEntity.setCreateTime(now);
+            }
+            if (baseEntity.getUpdateTime() == null) {
+                baseEntity.setUpdateTime(now);
+            }
+
             if (baseEntity.getDeleted() == null) {
                 baseEntity.setDeleted(0);
             }

@@ -5,6 +5,8 @@ import com.mybatisflex.annotation.UpdateListener;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+
 @Component
 public class MyUpdateListener implements UpdateListener {
 
@@ -14,8 +16,10 @@ public class MyUpdateListener implements UpdateListener {
     @Override
     public void onUpdate(Object entity) {
         if (entity instanceof MyBaseEntity) {
+            LocalDateTime now = LocalDateTime.now();
             MyBaseEntity baseEntity = (MyBaseEntity) entity;
             baseEntity.setUpdateBy(myUserIdProvider.getUserId());
+            baseEntity.setUpdateTime(now);
         }
     }
 }

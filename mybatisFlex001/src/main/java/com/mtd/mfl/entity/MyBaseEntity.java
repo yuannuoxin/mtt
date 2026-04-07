@@ -43,13 +43,13 @@ public class MyBaseEntity implements Serializable {
     /**
      * 创建时间
      */
-    @Column(onInsertValue = "now()")
+//    @Column(onInsertValue = "now()")
     private LocalDateTime createTime;
 
     /**
      * 更新时间
      */
-    @Column(onInsertValue = "now()", onUpdateValue = "now()")
+//    @Column(onInsertValue = "now()", onUpdateValue = "now()")
     private LocalDateTime updateTime;
 
     /**
