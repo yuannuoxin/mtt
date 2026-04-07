@@ -106,10 +106,6 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-        <dependency>
-            <groupId>com.mtd</groupId>
-            <artifactId>mtd-common-mybatis</artifactId>
-        </dependency>
     </dependencies>
 
     <build>
