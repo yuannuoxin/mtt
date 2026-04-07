@@ -3,6 +3,7 @@ package com.mtd.demo.controller;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.crypto.SecureUtil;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.core.toolkit.StringUtils;
 import com.mtd.common.core.constant.CommonConstants;
 import com.mtd.common.core.request.IdRequest;
@@ -27,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户控制器
@@ -39,6 +41,15 @@ import java.util.List;
 public class UserController {
 
     private final UserService userService;
+
+
+    @PostMapping("/selectListByMap")
+    public Object selectListByMap(@RequestBody Map<String, Object> params) {
+        QueryWrapper<User> wrapper = new QueryWrapper<>();
+        wrapper.allEq(params); // ← 关键方法
+
+        return Result.success(userService.list(wrapper));
+    }
 
     /**
      * 构建排序条件
