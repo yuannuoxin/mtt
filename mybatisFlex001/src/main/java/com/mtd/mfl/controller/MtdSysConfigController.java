@@ -1,17 +1,12 @@
 package com.mtd.mfl.controller;
 
-import com.mybatisflex.core.paginate.Page;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.mtd.common.core.result.Result;
 import com.mtd.mfl.entity.MtdSysConfig;
 import com.mtd.mfl.service.MtdSysConfigService;
-import org.springframework.web.bind.annotation.RestController;
+import com.mybatisflex.core.paginate.Page;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
 
 /**
@@ -34,8 +29,8 @@ public class MtdSysConfigController {
      * @return {@code true} 保存成功，{@code false} 保存失败
      */
     @PostMapping("save")
-    public boolean save(@RequestBody MtdSysConfig mtdSysConfig) {
-        return mtdSysConfigService.save(mtdSysConfig);
+    public Result<?> save(@RequestBody MtdSysConfig mtdSysConfig) {
+        return Result.success(mtdSysConfigService.save(mtdSysConfig));
     }
 
     /**
@@ -45,8 +40,8 @@ public class MtdSysConfigController {
      * @return {@code true} 删除成功，{@code false} 删除失败
      */
     @DeleteMapping("remove/{id}")
-    public boolean remove(@PathVariable Long id) {
-        return mtdSysConfigService.removeById(id);
+    public Result<?> remove(@PathVariable Long id) {
+        return Result.success(mtdSysConfigService.removeById(id));
     }
 
     /**
@@ -56,8 +51,8 @@ public class MtdSysConfigController {
      * @return {@code true} 更新成功，{@code false} 更新失败
      */
     @PutMapping("update")
-    public boolean update(@RequestBody MtdSysConfig mtdSysConfig) {
-        return mtdSysConfigService.updateById(mtdSysConfig);
+    public Result<?> update(@RequestBody MtdSysConfig mtdSysConfig) {
+        return Result.success(mtdSysConfigService.updateById(mtdSysConfig));
     }
 
     /**
@@ -66,8 +61,8 @@ public class MtdSysConfigController {
      * @return 所有数据
      */
     @GetMapping("list")
-    public List<MtdSysConfig> list() {
-        return mtdSysConfigService.list();
+    public Result<List<MtdSysConfig>> list() {
+        return Result.success(mtdSysConfigService.list());
     }
 
     /**
@@ -77,8 +72,8 @@ public class MtdSysConfigController {
      * @return 系统公共配置表详情
      */
     @GetMapping("getInfo/{id}")
-    public MtdSysConfig getInfo(@PathVariable Long id) {
-        return mtdSysConfigService.getById(id);
+    public Result<MtdSysConfig> getInfo(@PathVariable Long id) {
+        return Result.success(mtdSysConfigService.getById(id));
     }
 
     /**
@@ -88,8 +83,8 @@ public class MtdSysConfigController {
      * @return 分页对象
      */
     @PostMapping("page")
-    public Page<MtdSysConfig> page(@RequestBody Page<MtdSysConfig> page) {
-        return mtdSysConfigService.page(page);
+    public Result<Page<MtdSysConfig>> page(@RequestBody Page<MtdSysConfig> page) {
+        return Result.success(mtdSysConfigService.page(page));
     }
 
 }

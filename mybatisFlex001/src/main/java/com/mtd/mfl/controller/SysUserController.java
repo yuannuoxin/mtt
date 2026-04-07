@@ -1,18 +1,15 @@
 package com.mtd.mfl.controller;
 
-import com.mybatisflex.core.paginate.Page;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.mtd.common.core.result.Result;
 import com.mtd.mfl.entity.SysUser;
 import com.mtd.mfl.service.SysUserService;
-import org.springframework.web.bind.annotation.RestController;
+import com.mybatisflex.core.paginate.Page;
+import com.mybatisflex.core.query.QueryWrapper;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
 import java.util.List;
+import java.util.Map;
 
 /**
  * 用户表 控制层。
@@ -34,8 +31,8 @@ public class SysUserController {
      * @return {@code true} 保存成功，{@code false} 保存失败
      */
     @PostMapping("save")
-    public boolean save(@RequestBody SysUser sysUser) {
-        return sysUserService.save(sysUser);
+    public Result<?> save(@RequestBody SysUser sysUser) {
+        return Result.success(sysUserService.save(sysUser));
     }
 
     /**
@@ -45,8 +42,8 @@ public class SysUserController {
      * @return {@code true} 删除成功，{@code false} 删除失败
      */
     @DeleteMapping("remove/{id}")
-    public boolean remove(@PathVariable Long id) {
-        return sysUserService.removeById(id);
+    public Result<?> remove(@PathVariable Long id) {
+        return Result.success(sysUserService.removeById(id));
     }
 
     /**
@@ -56,8 +53,8 @@ public class SysUserController {
      * @return {@code true} 更新成功，{@code false} 更新失败
      */
     @PutMapping("update")
-    public boolean update(@RequestBody SysUser sysUser) {
-        return sysUserService.updateById(sysUser);
+    public Result<?> update(@RequestBody SysUser sysUser) {
+        return Result.success(sysUserService.updateById(sysUser));
     }
 
     /**
@@ -66,8 +63,8 @@ public class SysUserController {
      * @return 所有数据
      */
     @GetMapping("list")
-    public List<SysUser> list() {
-        return sysUserService.list();
+    public Result<?> list() {
+        return Result.success(sysUserService.list());
     }
 
     /**
@@ -77,8 +74,8 @@ public class SysUserController {
      * @return 用户表详情
      */
     @GetMapping("getInfo/{id}")
-    public SysUser getInfo(@PathVariable Long id) {
-        return sysUserService.getById(id);
+    public Result<?> getInfo(@PathVariable Long id) {
+        return Result.success(sysUserService.getById(id));
     }
 
     /**
@@ -88,8 +85,16 @@ public class SysUserController {
      * @return 分页对象
      */
     @PostMapping("page")
-    public Page<SysUser> page(@RequestBody Page<SysUser> page) {
-        return sysUserService.page(page);
+    public Result<?> page(@RequestBody Page<SysUser> page) {
+        return Result.success(sysUserService.page(page));
+    }
+
+    @PostMapping("/selectListByMap")
+    public Result<List<SysUser>> selectListByMap(@RequestBody Map<String, Object> conditions) {
+        // ✅ Flex 自动解析：key里的 _like / _gt / _gte
+        QueryWrapper wrapper = QueryWrapper.create()
+                .where(conditions); // 🔥 核心方法
+        return Result.success(sysUserService.list(wrapper));
     }
 
 }
