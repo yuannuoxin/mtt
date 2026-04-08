@@ -16,7 +16,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-@Transactional(readOnly = true, rollbackFor = Throwable.class)
+//@Transactional(readOnly = true, rollbackFor = Throwable.class)
 public class SysUserService {
 
     @Autowired
