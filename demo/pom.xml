@@ -45,6 +45,12 @@
             <artifactId>mtd-common-redis</artifactId>
         </dependency>
 
+        <!-- MTD Common Knife4j -->
+        <dependency>
+            <groupId>com.mtd</groupId>
+            <artifactId>mtd-common-doc</artifactId>
+        </dependency>
+
         <!-- Spring Boot -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -61,12 +67,6 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
-        </dependency>
-
-        <!-- Knife4j (Swagger 增强) -->
-        <dependency>
-            <groupId>com.github.xiaoymin</groupId>
-            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
         </dependency>
 
         <!-- PostgreSQL Driver -->

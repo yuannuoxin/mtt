@@ -316,6 +316,34 @@ public class SystemController {
         return Result.success(response);
     }
 
+    @Operation(summary = "Jackson 序列化测试2")
+    @PostMapping("/test-jackson-serialization2")
+    public Result<?> testJacksonSerialization2() {
+
+        // 设置一个较大的 Long 值（测试是否转为 String）
+        Long testLong0 = 1234567890123456789L;
+
+        Long testLong1 = 9007199254740990L;
+        Long testLong2 = 9007199254740991L;
+        Long testLong3 = 9007199254740992L;
+
+        Long testLong4 = -9007199254740990L;
+        Long testLong5 = -9007199254740991L;
+        Long testLong6 = -9007199254740992L;
+
+        Map<String, Object> map = new HashMap<>();
+        map.put("testLong0", testLong0);
+        map.put("testLong1", testLong1);
+        map.put("testLong2", testLong2);
+        map.put("testLong3", testLong3);
+        map.put("testLong4", testLong4);
+        map.put("testLong5", testLong5);
+        map.put("testLong6", testLong6);
+
+        return Result.success(map);
+    }
+
+
     @Operation(summary = "获取 Git 和构建信息", description = "获取当前版本的 Git 分支、提交时间、提交 ID 以及打包时间等信息")
     @PostMapping("/git-build-info")
     public Result<GitBuildInfoResponse> getGitBuildInfo() {

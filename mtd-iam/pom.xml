@@ -60,11 +60,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-redis</artifactId>
         </dependency>
-        
-        <!-- Knife4j -->
+
+        <!-- MTD Common Knife4j -->
         <dependency>
-            <groupId>com.github.xiaoymin</groupId>
-            <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
+            <groupId>com.mtd</groupId>
+            <artifactId>mtd-common-doc</artifactId>
         </dependency>
         
         <!-- Hutool -->

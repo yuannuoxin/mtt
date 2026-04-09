@@ -22,5 +22,7 @@
         <module>mtd-common-satoken</module>
         <module>mtd-common-web</module>
         <module>mtd-common-redis</module>
+        <module>mtd-common-doc</module>
+        <module>mtd-common-bom</module>
     </modules>
 </project>

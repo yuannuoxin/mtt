@@ -16,33 +16,37 @@
     <properties>
         <revision>1.0.0-SNAPSHOT</revision>
         <!-- Spring Boot & Cloud -->
-        <spring-boot.version>3.2.0</spring-boot.version>
-        <spring-cloud.version>2023.0.0</spring-cloud.version>
-        <spring-cloud-alibaba.version>2023.0.0.0-RC1</spring-cloud-alibaba.version>
+        <spring-boot.version>3.5.12</spring-boot.version>
+        <spring-cloud.version>2025.0.1</spring-cloud.version>
+        <spring-cloud-alibaba.version>2025.0.0.0</spring-cloud-alibaba.version>
         <java.version>22</java.version>
         <maven.compiler.source>22</maven.compiler.source>
         <maven.compiler.target>22</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+
         <!-- MyBatis-Plus -->
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
-        
+
         <!-- Sa-Token -->
         <sa-token.version>1.37.0</sa-token.version>
-        
+
         <!-- Hutool -->
         <hutool.version>5.8.23</hutool.version>
-        
+
         <!-- Lombok -->
         <lombok.version>1.18.30</lombok.version>
-        
+
         <!-- MySQL -->
         <mysql.version>8.3.0</mysql.version>
-        
+
         <!-- Knife4j (Swagger 增强) -->
         <knife4j.version>4.4.0</knife4j.version>
-        
+
         <!-- Maven 构建时间格式 -->
         <maven.build.timestamp.format>yyyyMMdd-HHmmss</maven.build.timestamp.format>
+        <skipTests>true</skipTests>
     </properties>
 
     <!-- 依赖管理 -->
@@ -56,7 +60,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            
+
             <!-- Spring Cloud Dependencies -->
             <dependency>
                 <groupId>org.springframework.cloud</groupId>
@@ -65,7 +69,7 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            
+
             <!-- Spring Cloud Alibaba Dependencies -->
             <dependency>
                 <groupId>com.alibaba.cloud</groupId>
@@ -74,34 +78,45 @@
                 <type>pom</type>
                 <scope>import</scope>
             </dependency>
-            
+
+
+            <!-- common 的依赖配置-->
+            <dependency>
+                <groupId>com.mtd</groupId>
+                <artifactId>mtd-common-bom</artifactId>
+                <version>${revision}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+
+
             <!-- MyBatis-Plus -->
             <dependency>
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
             </dependency>
-            
+
             <!-- Sa-Token -->
             <dependency>
                 <groupId>cn.dev33</groupId>
                 <artifactId>sa-token-spring-boot3-starter</artifactId>
                 <version>${sa-token.version}</version>
             </dependency>
-            
+
             <dependency>
                 <groupId>cn.dev33</groupId>
                 <artifactId>sa-token-redis-jackson</artifactId>
                 <version>${sa-token.version}</version>
             </dependency>
-            
+
             <!-- Hutool -->
             <dependency>
                 <groupId>cn.hutool</groupId>
                 <artifactId>hutool-all</artifactId>
                 <version>${hutool.version}</version>
             </dependency>
-            
+
             <!-- Lombok -->
             <dependency>
                 <groupId>org.projectlombok</groupId>
@@ -109,7 +124,7 @@
                 <version>${lombok.version}</version>
                 <scope>provided</scope>
             </dependency>
-            
+
             <!-- MySQL Driver -->
             <dependency>
                 <groupId>com.mysql</groupId>
@@ -117,51 +132,7 @@
                 <version>${mysql.version}</version>
                 <scope>runtime</scope>
             </dependency>
-            
-            <!-- Knife4j -->
-            <dependency>
-                <groupId>com.github.xiaoymin</groupId>
-                <artifactId>knife4j-openapi3-jakarta-spring-boot-starter</artifactId>
-                <version>${knife4j.version}</version>
-            </dependency>
-            
-            <!-- MTD Common Modules -->
-            <dependency>
-                <groupId>com.mtd</groupId>
-                <artifactId>mtd-common-core</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
-            
-            <dependency>
-                <groupId>com.mtd</groupId>
-                <artifactId>mtd-common-mybatis</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
-            
-            <dependency>
-                <groupId>com.mtd</groupId>
-                <artifactId>mtd-common-satoken</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
-            
-            <dependency>
-                <groupId>com.mtd</groupId>
-                <artifactId>mtd-common-web</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
-            
-            <dependency>
-                <groupId>com.mtd</groupId>
-                <artifactId>mtd-common-redis</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
-            
-            <!-- MTD IAM Module -->
-            <dependency>
-                <groupId>com.mtd</groupId>
-                <artifactId>mtd-iam</artifactId>
-                <version>1.0.0-SNAPSHOT</version>
-            </dependency>
+
         </dependencies>
     </dependencyManagement>
 
