@@ -15,10 +15,9 @@ public class MyInsertListener implements InsertListener {
 
     @Override
     public void onInsert(Object entity) {
-        if (entity instanceof MyBaseEntity) {
+        if (entity instanceof MyBaseEntity baseEntity) {
             LocalDateTime now = LocalDateTime.now();
-            MyBaseEntity baseEntity = (MyBaseEntity) entity;
-            
+
             if (baseEntity.getCreateBy() == null) {
                 baseEntity.setCreateBy(myUserIdProvider.getUserId());
             }

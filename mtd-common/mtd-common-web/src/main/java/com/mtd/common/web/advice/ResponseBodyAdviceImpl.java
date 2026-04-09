@@ -34,9 +34,7 @@ public class ResponseBodyAdviceImpl implements ResponseBodyAdvice<Object> {
                                    ServerHttpResponse response) {
         // 从 MDC 中获取 RequestID
         String requestId = MDC.get("requestId");
-        
-        if (body instanceof Result && requestId != null) {
-            Result<?> result = (Result<?>) body;
+        if (body instanceof Result<?> result && requestId != null) {
             result.setRequestId(requestId);
         }
         

@@ -15,9 +15,8 @@ public class MyUpdateListener implements UpdateListener {
 
     @Override
     public void onUpdate(Object entity) {
-        if (entity instanceof MyBaseEntity) {
+        if (entity instanceof MyBaseEntity baseEntity) {
             LocalDateTime now = LocalDateTime.now();
-            MyBaseEntity baseEntity = (MyBaseEntity) entity;
             baseEntity.setUpdateBy(myUserIdProvider.getUserId());
             baseEntity.setUpdateTime(now);
         }
