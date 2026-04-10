@@ -7,7 +7,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.mtd.common.core.result.Result;
 import com.mtd.demo.constant.StrConstant;
-import com.mtd.demo.request.TableQueryRequest;
+import com.mtd.demo.req.TableQueryRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.beans.factory.annotation.Autowired;

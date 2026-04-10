@@ -28,11 +28,9 @@
             <pattern>${FILE_PATTERN}</pattern>
             <charset>UTF-8</charset>
         </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>${LOG_PATH}/${APP_NAME}-info.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-                <maxFileSize>100MB</maxFileSize>
-            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxFileSize>100MB</maxFileSize>
             <maxHistory>30</maxHistory>
             <totalSizeCap>10GB</totalSizeCap>
         </rollingPolicy>
@@ -50,11 +48,9 @@
             <pattern>${FILE_PATTERN}</pattern>
             <charset>UTF-8</charset>
         </encoder>
-        <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
             <fileNamePattern>${LOG_PATH}/${APP_NAME}-error.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
-            <timeBasedFileNamingAndTriggeringPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedFNATP">
-                <maxFileSize>100MB</maxFileSize>
-            </timeBasedFileNamingAndTriggeringPolicy>
+            <maxFileSize>100MB</maxFileSize>
             <maxHistory>90</maxHistory>
             <totalSizeCap>20GB</totalSizeCap>
         </rollingPolicy>
@@ -63,15 +59,6 @@
             <onMatch>ACCEPT</onMatch>
             <onMismatch>DENY</onMismatch>
         </filter>
-    </appender>
-
-    <!-- RequestLogAspect 专用异步日志 -->
-    <appender name="ASYNC_REQUEST_LOG" class="ch.qos.logback.classic.AsyncAppender">
-        <appender-ref ref="CONSOLE"/>
-        <appender-ref ref="INFO_FILE"/>
-        <queueSize>512</queueSize>
-        <discardingThreshold>0</discardingThreshold>
-        <includeCallerData>false</includeCallerData>
     </appender>
 
     <!-- local环境：只输出到控制台 -->
@@ -84,7 +71,7 @@
     </springProfile>
 
     <!-- 生产环境：输出到文件和控制台 -->
-    <springProfile name="prod">
+    <springProfile name="!local">
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="INFO_FILE"/>
@@ -93,22 +80,6 @@
         <logger name="com.mtd.demo" level="INFO"/>
         <logger name="org.springframework" level="WARN"/>
         <logger name="com.baomidou.mybatisplus" level="WARN"/>
-    </springProfile>
-
-    <!-- 默认配置：当指定了 profile 但没匹配上时，使用此配置 -->
-    <springProfile name="!local &amp; !prod">
-        <root level="INFO">
-            <appender-ref ref="CONSOLE"/>
-            <appender-ref ref="INFO_FILE"/>
-            <appender-ref ref="ERROR_FILE"/>
-        </root>
-        <!-- RequestLogAspect 使用异步日志 -->
-        <logger name="com.mtd.common.web.aspect.RequestLogAspect" level="INFO" additivity="false">
-            <appender-ref ref="ASYNC_REQUEST_LOG"/>
-        </logger>
-        <logger name="com.mtd.demo" level="DEBUG"/>
-        <logger name="org.springframework" level="INFO"/>
-        <logger name="com.baomidou.mybatisplus" level="DEBUG"/>
     </springProfile>
 
 </configuration>

@@ -9,7 +9,7 @@ import com.mtd.common.core.result.Result;
 import com.mtd.common.core.result.ResultCode;
 import com.mtd.common.core.exception.BusinessException;
 import com.mtd.demo.entity.User;
-import com.mtd.demo.request.LoginRequest;
+import com.mtd.demo.req.LoginRequest;
 import com.mtd.demo.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

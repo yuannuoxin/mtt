@@ -28,6 +28,7 @@
 
         <!-- MyBatis-Plus -->
         <mybatis-plus.version>3.5.5</mybatis-plus.version>
+        <mybatis-flex.version>1.11.6</mybatis-flex.version>
 
         <!-- Sa-Token -->
         <sa-token.version>1.37.0</sa-token.version>
@@ -97,6 +98,18 @@
                 <groupId>com.baomidou</groupId>
                 <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
                 <version>${mybatis-plus.version}</version>
+            </dependency>
+
+
+            <dependency>
+                <groupId>com.mybatis-flex</groupId>
+                <artifactId>mybatis-flex-spring-boot3-starter</artifactId>
+                <version>${mybatis-flex.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>com.mybatis-flex</groupId>
+                <artifactId>mybatis-flex-processor</artifactId>
+                <version>${mybatis-flex.version}</version>
             </dependency>
 
             <!-- Sa-Token -->

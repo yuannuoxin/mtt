@@ -27,6 +27,11 @@
                 <artifactId>mtd-common-mybatis</artifactId>
                 <version>${revision}</version>
             </dependency>
+            <dependency>
+                <groupId>com.mtd</groupId>
+                <artifactId>mtd-common-mybatis-flex</artifactId>
+                <version>${revision}</version>
+            </dependency>
 
             <dependency>
                 <groupId>com.mtd</groupId>

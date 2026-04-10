@@ -24,5 +24,6 @@
         <module>mtd-common-redis</module>
         <module>mtd-common-doc</module>
         <module>mtd-common-bom</module>
+        <module>mtd-common-mybatis-flex</module>
     </modules>
 </project>
