@@ -1,8 +1,8 @@
 package com.mtd.common.mybatis.handler;
 
 import com.baomidou.mybatisplus.core.handlers.MetaObjectHandler;
+import com.mtd.common.core.provider.UserIdProvider;
 import com.mtd.common.mybatis.base.BaseEntity;
-import com.mtd.common.mybatis.user.UserIdProvider;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.ibatis.reflection.MetaObject;
 import org.springframework.beans.factory.annotation.Autowired;

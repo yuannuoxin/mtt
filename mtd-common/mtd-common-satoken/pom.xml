@@ -17,10 +17,10 @@
     <description>MTD Sa-Token Integration</description>
 
     <dependencies>
-        <!-- MTD MyBatis (需要 UserIdProvider 接口) -->
+
         <dependency>
             <groupId>com.mtd</groupId>
-            <artifactId>mtd-common-mybatis</artifactId>
+            <artifactId>mtd-common-core</artifactId>
         </dependency>
         
         <!-- Sa-Token -->

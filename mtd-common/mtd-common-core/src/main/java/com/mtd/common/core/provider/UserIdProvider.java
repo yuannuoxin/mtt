@@ -1,4 +1,4 @@
-package com.mtd.common.mybatis.user;
+package com.mtd.common.core.provider;
 
 /**
  * 用户 ID 提供者接口

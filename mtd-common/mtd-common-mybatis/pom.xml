@@ -17,6 +17,11 @@
     <description>MTD MyBatis-Plus Integration</description>
 
     <dependencies>
+
+        <dependency>
+            <groupId>com.mtd</groupId>
+            <artifactId>mtd-common-core</artifactId>
+        </dependency>
         <!-- MyBatis-Plus -->
         <dependency>
             <groupId>com.baomidou</groupId>

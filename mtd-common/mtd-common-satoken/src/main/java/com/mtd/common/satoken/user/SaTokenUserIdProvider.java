@@ -1,7 +1,7 @@
 package com.mtd.common.satoken.user;
 
 import cn.dev33.satoken.stp.StpUtil;
-import com.mtd.common.mybatis.user.UserIdProvider;
+import com.mtd.common.core.provider.UserIdProvider;
 import org.springframework.stereotype.Component;
 
 /**
