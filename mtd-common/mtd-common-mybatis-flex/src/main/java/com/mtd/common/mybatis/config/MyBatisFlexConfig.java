@@ -1,6 +1,6 @@
 package com.mtd.common.mybatis.config;
 
-import com.mtd.common.core.provider.UserIdProvider;
+import ch.qos.logback.core.util.StringUtil;
 import com.mtd.common.mybatis.base.BaseEntity;
 import com.mtd.common.mybatis.handler.MyMetaObjectHandler;
 import com.mybatisflex.core.FlexGlobalConfig;
@@ -8,9 +8,12 @@ import com.mybatisflex.core.audit.AuditManager;
 import com.mybatisflex.core.audit.AuditMessage;
 import com.mybatisflex.core.audit.MessageFactory;
 import jakarta.annotation.PostConstruct;
+import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Configuration;
 
+@Slf4j
 @Configuration
 public class MyBatisFlexConfig {
 
@@ -31,12 +34,8 @@ public class MyBatisFlexConfig {
             message.setUser("用户:" + myMetaObjectHandler.getCurrentUserId());
             return message;
         };
-
         AuditManager.setMessageFactory(factory);
-        AuditManager.setMessageCollector(auditMessage ->
-                System.out.println("[SQL审计] 用户: " + auditMessage.getUser() +
-                        " | SQL: " + auditMessage.getFullSql() +
-                        " | 耗时: " + auditMessage.getElapsedTime() + "ms")
+        AuditManager.setMessageCollector(auditMessage -> log.info("[SQL审计] {} 用户: {} | SQL: {} | 耗时: {}", StringUtil.nullStringToEmpty(MDC.get("requestId")), auditMessage.getUser(), auditMessage.getFullSql(), auditMessage.getElapsedTime())
         );
 
         FlexGlobalConfig config = FlexGlobalConfig.getDefaultConfig();

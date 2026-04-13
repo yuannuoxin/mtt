@@ -1,4 +1,4 @@
-package com.mtd.st.resp.tmp;
+package com.mtd.st.model.resp.tmp;
 
 import lombok.Data;
 
