@@ -9,6 +9,7 @@ import com.mtd.st.model.req.IdReq;
 import com.mtd.st.model.req.PermissionCreateReq;
 import com.mtd.st.model.req.PermissionPageReq;
 import com.mtd.st.model.req.PermissionUpdateReq;
+import com.mtd.st.model.resp.SysPermissionResp;
 import com.mtd.st.service.PermissionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,6 +47,13 @@ public class PermissionController {
     @SaCheckPermission(PermCode.PERM_VIEW)
     public Result<List<SysPermission>> listByParentId(@RequestParam(required = false) Long parentId) {
         return Result.success(permissionService.listByParentId(parentId));
+    }
+
+    @Operation(summary = "查询权限树")
+    @PostMapping("/getPermissionTree")
+    @SaCheckPermission(PermCode.PERM_VIEW)
+    public Result<List<SysPermissionResp>> getPermissionTree(@RequestBody List<Integer> typeList) {
+        return Result.success(permissionService.getPermissionTree(typeList));
     }
 
     @Operation(summary = "创建权限")

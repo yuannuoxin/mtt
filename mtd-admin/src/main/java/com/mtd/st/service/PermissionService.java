@@ -2,13 +2,16 @@ package com.mtd.st.service;
 
 import com.mtd.common.core.exception.BusinessException;
 import com.mtd.common.core.result.ResultCode;
-import com.mtd.st.model.entity.SysPermission;
 import com.mtd.st.enums.StatusEnum;
 import com.mtd.st.mapper.SysPermissionMapper;
+import com.mtd.st.model.entity.SysPermission;
 import com.mtd.st.model.entity.table.SysPermissionTableDef;
 import com.mtd.st.model.req.PermissionCreateReq;
 import com.mtd.st.model.req.PermissionPageReq;
 import com.mtd.st.model.req.PermissionUpdateReq;
+import com.mtd.st.model.resp.SysPermissionResp;
+import com.mtd.st.utils.ListToTreeUtil;
+import com.mtd.st.utils.MapstructUtils;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -106,5 +109,20 @@ public class PermissionService {
     @Transactional
     public void delete(Long id) {
         permissionMapper.deleteById(id);
+    }
+
+    public List<SysPermissionResp> getPermissionTree(List<Integer> typeList) {
+        QueryWrapper query = QueryWrapper.create();
+        if (typeList != null && !typeList.isEmpty()) {
+            query.and(SysPermissionTableDef.SYS_PERMISSION.PERM_TYPE.in(typeList));
+        }
+        List<SysPermission> sysPermissions = permissionMapper.selectListByQuery(query);
+        List<SysPermissionResp> sysPermissionRespList = MapstructUtils.convert(sysPermissions, SysPermissionResp.class);
+        return ListToTreeUtil.convertListToTree(sysPermissionRespList,
+                SysPermissionResp::getId,
+                SysPermissionResp::getParentId,
+                SysPermissionResp::getChildren,
+                SysPermissionResp::setChildren
+        );
     }
 }

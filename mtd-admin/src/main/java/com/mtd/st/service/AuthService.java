@@ -131,8 +131,7 @@ public class AuthService {
         return resp;
     }
 
-    public Result<PermissionResp> getPermissions() {
-        Long userId = StpUtil.getLoginIdAsLong();
+    public Result<PermissionResp> getPermissions(Long userId) {
         PermissionResp permissionVo = new PermissionResp();
 
         List<String> roleCodes = getUserRoles(userId);
@@ -152,7 +151,7 @@ public class AuthService {
         );
     }
 
-    private List<String> getUserRoles(Long userId) {
+    public List<String> getUserRoles(Long userId) {
         SysRoleTableDef role = SysRoleTableDef.SYS_ROLE;
         SysUserRoleTableDef userRole = SysUserRoleTableDef.SYS_USER_ROLE;
 
@@ -167,7 +166,7 @@ public class AuthService {
         return roles.stream().map(SysRole::getRoleCode).collect(Collectors.toList());
     }
 
-    private List<String> getUserPermissions(Long userId) {
+    public List<String> getUserPermissions(Long userId) {
         SysPermissionTableDef perm = SysPermissionTableDef.SYS_PERMISSION;
         SysRolePermissionTableDef rolePerm = SysRolePermissionTableDef.SYS_ROLE_PERMISSION;
         SysUserRoleTableDef userRole = SysUserRoleTableDef.SYS_USER_ROLE;

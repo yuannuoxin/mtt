@@ -4,6 +4,7 @@ import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.stp.StpUtil;
 import com.mtd.common.core.result.Result;
 import com.mtd.st.model.req.EmailCodeLoginReq;
+import com.mtd.st.model.req.IdReq;
 import com.mtd.st.model.req.PasswordLoginReq;
 import com.mtd.st.model.req.SendEmailCodeReq;
 import com.mtd.st.model.resp.LoginResp;
@@ -18,6 +19,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @Tag(name = "认证管理", description = "登录/登出接口")
 @RestController
@@ -70,7 +73,22 @@ public class AuthController {
     @PostMapping("/getPermissions")
     @SaCheckLogin
     public Result<PermissionResp> getPermissions() {
-        return authService.getPermissions();
+        Long userId = StpUtil.getLoginIdAsLong();
+        return authService.getPermissions(userId);
+    }
+
+    @Operation(summary = "getUserRoles")
+    @PostMapping("/getUserRoles")
+    @SaCheckLogin
+    public Result<List<String>> getUserRoles(@RequestBody IdReq req) {
+        return Result.success(authService.getUserRoles(req.getId()));
+    }
+
+    @Operation(summary = "getUserPermissions")
+    @PostMapping("/getUserPermissions")
+    @SaCheckLogin
+    public Result<List<String>> getUserPermissions(@RequestBody IdReq req) {
+        return Result.success(authService.getUserPermissions(req.getId()));
     }
 
 

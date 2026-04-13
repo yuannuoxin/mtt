@@ -146,4 +146,12 @@ public class UserService extends ServiceImpl<SysUserMapper, SysUser> {
             userRoleMapper.insert(userRole);
         }
     }
+
+    public List<Long> getAssignRoleIdsByUserId(Long id) {
+        return Objects.requireNonNull(userRoleMapper.selectListByQuery(
+                QueryWrapper.create()
+                        .select(SysUserRoleTableDef.SYS_USER_ROLE.ROLE_ID)
+                        .where(SysUserRoleTableDef.SYS_USER_ROLE.USER_ID.eq(id))
+        )).stream().map(SysUserRole::getRoleId).toList();
+    }
 }

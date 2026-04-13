@@ -3,20 +3,20 @@ package com.mtd.st.controller;
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.mtd.common.core.result.Result;
-import com.mtd.st.model.entity.SysRole;
 import com.mtd.st.constant.PermCode;
-import com.mtd.st.model.req.AssignPermissionReq;
-import com.mtd.st.model.req.IdReq;
-import com.mtd.st.model.req.RoleCreateReq;
-import com.mtd.st.model.req.RolePageReq;
-import com.mtd.st.model.req.RoleUpdateReq;
+import com.mtd.st.model.entity.SysRole;
+import com.mtd.st.model.req.*;
 import com.mtd.st.service.RoleService;
+import com.mybatisflex.core.paginate.Page;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
-import com.mybatisflex.core.paginate.Page;
+import java.util.List;
 
 @Tag(name = "角色管理")
 @RestController
@@ -71,5 +71,11 @@ public class RoleController {
     public Result<Void> assignPermissions(@RequestBody AssignPermissionReq req) {
         roleService.assignPermissions(req);
         return Result.success();
+    }
+
+    @Operation(summary = "查询角色有哪些权限")
+    @PostMapping("/getAssignPermissionIdsByRoleId")
+    public Result<List<Long>> getAssignPermissionIdsByRoleId(@RequestBody IdReq req) {
+        return Result.success(roleService.getAssignPermissionIdsByRoleId(req.getId()));
     }
 }

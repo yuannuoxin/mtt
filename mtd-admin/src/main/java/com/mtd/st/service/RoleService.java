@@ -9,10 +9,7 @@ import com.mtd.st.model.entity.SysRole;
 import com.mtd.st.model.entity.SysRolePermission;
 import com.mtd.st.model.entity.table.SysRolePermissionTableDef;
 import com.mtd.st.model.entity.table.SysRoleTableDef;
-import com.mtd.st.model.req.AssignPermissionReq;
-import com.mtd.st.model.req.RoleCreateReq;
-import com.mtd.st.model.req.RolePageReq;
-import com.mtd.st.model.req.RoleUpdateReq;
+import com.mtd.st.model.req.*;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
@@ -130,5 +127,13 @@ public class RoleService {
             rolePermission.setPermissionId(permissionId);
             rolePermissionMapper.insert(rolePermission);
         }
+    }
+
+    public List<Long> getAssignPermissionIdsByRoleId(Long roleId) {
+        return Objects.requireNonNull(rolePermissionMapper.selectListByQuery(
+                QueryWrapper.create()
+                        .select(SysRolePermissionTableDef.SYS_ROLE_PERMISSION.PERMISSION_ID)
+                        .where(SysRolePermissionTableDef.SYS_ROLE_PERMISSION.ROLE_ID.eq(roleId))
+        )).stream().map(SysRolePermission::getPermissionId).toList();
     }
 }

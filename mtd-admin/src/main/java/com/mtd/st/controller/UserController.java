@@ -6,6 +6,7 @@ import com.mtd.common.core.result.Result;
 import com.mtd.st.constant.PermCode;
 import com.mtd.st.model.entity.SysUser;
 import com.mtd.st.model.req.*;
+import com.mtd.st.service.AuthService;
 import com.mtd.st.service.UserService;
 import com.mybatisflex.core.paginate.Page;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,6 +17,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @Tag(name = "用户管理")
 @RestController
 @RequestMapping("/system/user")
@@ -24,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class UserController {
 
     private final UserService userService;
+    private final AuthService authService;
 
     @Operation(summary = "用户列表")
     @PostMapping("/page")
@@ -69,5 +73,11 @@ public class UserController {
     public Result<Void> assignRoles(@RequestBody AssignRoleReq req) {
         userService.assignRoles(req);
         return Result.success();
+    }
+
+    @Operation(summary = "查询用户有哪些角色")
+    @PostMapping("/getAssignRoleIdsByUserId")
+    public Result<List<Long>> getAssignRoleIdsByUserId(@RequestBody IdReq req) {
+        return Result.success(userService.getAssignRoleIdsByUserId(req.getId()));
     }
 }
