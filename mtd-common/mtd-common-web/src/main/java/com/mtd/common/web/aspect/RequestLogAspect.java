@@ -7,13 +7,9 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.*;
-import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * 请求日志切面
@@ -22,27 +18,14 @@ import java.util.List;
 @Slf4j
 @Aspect
 @Component
-@ConfigurationProperties(prefix = "request.log")
 public class RequestLogAspect {
 
-    /**
-     * 需要忽略的完整类名列表
-     */
-    private List<String> ignoreClasses = new ArrayList<>();
 
-    /**
-     * 需要忽略的方法列表（格式：完整类名.方法名）
-     */
-    private List<String> ignoreMethods = new ArrayList<>();
+    private final LogReqResConfig logReqResConfig;
 
-    public void setIgnoreClasses(List<String> ignoreClasses) {
-        this.ignoreClasses = ignoreClasses != null ? ignoreClasses : new ArrayList<>();
+    public RequestLogAspect(LogReqResConfig logReqResConfig) {
+        this.logReqResConfig = logReqResConfig;
     }
-
-    public void setIgnoreMethods(List<String> ignoreMethods) {
-        this.ignoreMethods = ignoreMethods != null ? ignoreMethods : new ArrayList<>();
-    }
-
 
     /**
      * 定义切点：所有 Controller 层方法
@@ -160,16 +143,12 @@ public class RequestLogAspect {
         String methodName = joinPoint.getSignature().getName();
 
         // 检查是否在忽略的类列表中
-        if (ignoreClasses.contains(className)) {
+        if (logReqResConfig.getIgnoreClasses().contains(className)) {
             return true;
         }
 
         // 检查是否在忽略的方法列表中（格式：类名.方法名）
         String fullMethodName = className + "." + methodName;
-        if (ignoreMethods.contains(fullMethodName)) {
-            return true;
-        }
-
-        return false;
+        return logReqResConfig.getIgnoreMethods().contains(fullMethodName);
     }
 }
