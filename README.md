@@ -24,8 +24,9 @@ mtd/
 │   └── pom.xml
 ├── mtd-common/                        # 公共模块
 │   ├── mtd-common-bom/               # BOM 依赖管理
-│   ├── mtd-common-core/              # 核心模块（异常、响应、常量等）
+│   ├── mtd-common-core/              # 核心模块（异常、响应、常量、接口定义等）
 │   ├── mtd-common-mybatis/           # MyBatis-Plus 配置
+│   ├── mtd-common-mybatis-flex/      # MyBatis-Flex 配置
 │   ├── mtd-common-satoken/           # Sa-Token 权限认证
 │   ├── mtd-common-web/               # Web 通用组件
 │   └── mtd-common-redis/             # Redis 配置
@@ -123,10 +124,12 @@ mvn spring-boot:run
 - 基础请求参数封装
 - 分页响应封装
 - 业务异常类
+- Provider 接口定义（`UserIdProvider`、`RequestIdProvider`）
 
 ### mtd-common-web
 Web 通用组件：
 - RequestID 过滤器（链路追踪）
+- Provider 实现（`WebRequestIdProvider`）
 - 统一响应体增强（ResponseBodyAdvice）
 - 接口日志切面（RequestLogAspect）
 
@@ -135,6 +138,12 @@ MyBatis-Plus 配置：
 - 分页插件
 - 自动填充处理器（创建时间、更新时间、操作人）
 - 逻辑删除配置
+
+### mtd-common-mybatis-flex
+MyBatis-Flex 配置：
+- SQL 审计日志（支持 RequestID 追踪）
+- 自动填充监听器（插入/更新）
+- 可选依赖 RequestIdProvider（有则使用，无则跳过）
 
 ### mtd-common-satoken
 Sa-Token 集成：
@@ -179,6 +188,10 @@ BOM 依赖管理，统一管理各模块版本
 - 每个请求自动生成唯一 ID
 - 通过 MDC 在日志中传递
 - 在响应头中返回给客户端
+- **分层架构设计**：
+  - `mtd-common-core` 定义 `RequestIdProvider` 接口
+  - `mtd-common-web` 实现 `WebRequestIdProvider`（从 MDC 获取）
+  - `mtd-common-mybatis-flex` 按需注入使用（可选依赖）
 
 ### 5. 字段自动填充
 - 创建时间/更新时间自动填充
