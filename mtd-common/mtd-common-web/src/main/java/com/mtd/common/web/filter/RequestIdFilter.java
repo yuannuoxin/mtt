@@ -1,5 +1,6 @@
 package com.mtd.common.web.filter;
 
+import com.mtd.common.core.constant.StrCommonConstant;
 import jakarta.servlet.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,7 +29,6 @@ public class RequestIdFilter implements Filter {
     /**
      * MDC 中的 Key
      */
-    private static final String MDC_KEY = "requestId";
 
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
@@ -42,7 +42,7 @@ public class RequestIdFilter implements Filter {
             String requestId = getOrGenerateRequestId(httpRequest);
             
             // 2. 放入 MDC 上下文（这样日志中会自动包含 requestId）
-            MDC.put(MDC_KEY, requestId);
+            MDC.put(StrCommonConstant.MDC_KEY, requestId);
             
             // 3. 将 RequestID 放入响应头，方便前端追踪
             httpResponse.setHeader(REQUEST_ID_HEADER, requestId);

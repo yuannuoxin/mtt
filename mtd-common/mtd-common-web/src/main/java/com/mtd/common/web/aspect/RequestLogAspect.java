@@ -2,6 +2,7 @@ package com.mtd.common.web.aspect;
 
 import cn.hutool.extra.servlet.JakartaServletUtil;
 import cn.hutool.json.JSONUtil;
+import com.mtd.common.core.constant.StrCommonConstant;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
@@ -42,7 +43,7 @@ public class RequestLogAspect {
             String url = request != null ? request.getRequestURL().toString() : null;
             String className = joinPoint.getSignature().getDeclaringTypeName();
             String methodName = joinPoint.getSignature().getName();
-            String requestId = org.slf4j.MDC.get("requestId");
+            String requestId = org.slf4j.MDC.get(StrCommonConstant.MDC_KEY);
             String ip = request != null ? JakartaServletUtil.getClientIP(request) : null;
 
             // 记录日志
