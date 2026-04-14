@@ -67,3 +67,11 @@ knife4j:
   setting:
     language: zh_cn
     swagger-model-name: 实体类列表
+#
+request:
+  log:
+    ignore-classes:
+      - com.mtd.st.controller.HealthController
+    ignore-methods:
+      - com.mtd.st.controller.HealthController.ping
+      - com.mtd.st.controller.HealthController.heartbeat

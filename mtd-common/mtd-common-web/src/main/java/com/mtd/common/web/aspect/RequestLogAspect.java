@@ -7,9 +7,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.*;
+import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * 请求日志切面
@@ -18,7 +22,26 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 @Slf4j
 @Aspect
 @Component
+@ConfigurationProperties(prefix = "request.log")
 public class RequestLogAspect {
+
+    /**
+     * 需要忽略的完整类名列表
+     */
+    private List<String> ignoreClasses = new ArrayList<>();
+
+    /**
+     * 需要忽略的方法列表（格式：完整类名.方法名）
+     */
+    private List<String> ignoreMethods = new ArrayList<>();
+
+    public void setIgnoreClasses(List<String> ignoreClasses) {
+        this.ignoreClasses = ignoreClasses != null ? ignoreClasses : new ArrayList<>();
+    }
+
+    public void setIgnoreMethods(List<String> ignoreMethods) {
+        this.ignoreMethods = ignoreMethods != null ? ignoreMethods : new ArrayList<>();
+    }
 
 
     /**
@@ -34,6 +57,11 @@ public class RequestLogAspect {
     @Before("controllerPointcut()")
     public void before(JoinPoint joinPoint) {
         try {
+            // 检查是否需要忽略
+            if (shouldIgnore(joinPoint)) {
+                return;
+            }
+
             // 获取请求上下文
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
             HttpServletRequest request = attributes != null ? attributes.getRequest() : null;
@@ -65,6 +93,11 @@ public class RequestLogAspect {
     @AfterReturning(pointcut = "controllerPointcut()", returning = "result")
     public void afterReturning(JoinPoint joinPoint, Object result) {
         try {
+            // 检查是否需要忽略
+            if (shouldIgnore(joinPoint)) {
+                return;
+            }
+
             // 获取 RequestID
             String requestId = org.slf4j.MDC.get("requestId");
 
@@ -100,6 +133,11 @@ public class RequestLogAspect {
     @AfterThrowing(pointcut = "controllerPointcut()", throwing = "e")
     public void afterThrowing(JoinPoint joinPoint, Throwable e) {
         try {
+            // 检查是否需要忽略
+            if (shouldIgnore(joinPoint)) {
+                return;
+            }
+
             String requestId = org.slf4j.MDC.get("requestId");
             String exceptionMessage = e.getMessage();
             String exceptionType = e.getClass().getName();
@@ -112,5 +150,26 @@ public class RequestLogAspect {
         } catch (Exception ex) {
             log.info("记录请求日志异常：", e);
         }
+    }
+
+    /**
+     * 判断是否应该忽略该方法的日志记录
+     */
+    private boolean shouldIgnore(JoinPoint joinPoint) {
+        String className = joinPoint.getSignature().getDeclaringTypeName();
+        String methodName = joinPoint.getSignature().getName();
+
+        // 检查是否在忽略的类列表中
+        if (ignoreClasses.contains(className)) {
+            return true;
+        }
+
+        // 检查是否在忽略的方法列表中（格式：类名.方法名）
+        String fullMethodName = className + "." + methodName;
+        if (ignoreMethods.contains(fullMethodName)) {
+            return true;
+        }
+
+        return false;
     }
 }
