@@ -11,13 +11,13 @@ spring:
   
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://kpanel7.003.mtt.qzz.io:5432/mydb
+    url: jdbc:postgresql://127.0.0.1:5432/mydb
     username: postgres
-    password: 08a5e78a38a9417ab8ec91c9d2c31c19
+    password: postgres
   
   data:
     redis:
-      host: kpanel7.003.mtt.qzz.io
+      host: 127.0.0.1
       port: 6379
       password: 08a5e78a38a9417ab8ec91c9d2c31c19
       database: 0
