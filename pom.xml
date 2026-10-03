@@ -159,10 +159,11 @@
 
     <modules>
         <module>mtd-common</module>
-        <module>demo</module>
-        <module>mtd-iam</module>
-        <module>mybatisFlex001</module>
-        <module>myJpaQueryDSL</module>
-        <module>mtd-admin</module>
+<!--        <module>demo</module>-->
+<!--        <module>mtd-iam</module>-->
+<!--        <module>mybatisFlex001</module>-->
+<!--        <module>myJpaQueryDSL</module>-->
+<!--        <module>mtd-admin</module>-->
+        <module>mtd-tt</module>
     </modules>
 </project>

@@ -1,0 +1,81 @@
+server:
+  port: 8085
+
+spring:
+  application:
+    name: mtd-tt
+  
+  threads:
+    virtual:
+      enabled: true
+  
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://kpanel7.003.mtt.qzz.io:5432/mydb
+    username: postgres
+    password: 08a5e78a38a9417ab8ec91c9d2c31c19
+  
+  data:
+    redis:
+      host: kpanel7.003.mtt.qzz.io
+      port: 6379
+      password: 08a5e78a38a9417ab8ec91c9d2c31c19
+      database: 0
+
+# Sa-Token 配置
+sa-token:
+  # token 名称（同时也是 cookie 名称）
+  token-name: authorization
+  # token前缀
+  token-prefix: "Bearer"
+  # token 有效期（单位：秒） 默认30天，-1 代表永久有效
+  timeout: 2592000
+  # token 最低活跃频率（单位：秒），如果 token 超过此时间没有访问系统就会被冻结，默认-1 代表不限制，永不冻结
+  active-timeout: -1
+  # 是否允许同一账号多地同时登录 （为 true 时允许一起登录, 为 false 时新登录挤掉旧登录）
+  is-concurrent: false
+  # 在多人登录同一账号时，是否共用一个 token （为 true 时所有登录共用一个 token, 为 false 时每次登录新建一个 token）
+  is-share: false
+  # token 风格（默认可取值：uuid、simple-uuid、random-32、random-64、random-128、tik）
+  token-style: uuid
+  # 是否输出操作日志
+  is-log: true
+  # 是否从cookie中读取token
+  is-read-cookie: false
+  # 是否从请求体里读取token
+  is-read-body: false
+  # 是否从header中读取token
+  is-read-header: true
+
+#
+mybatis-flex:
+  configuration:
+    # 关闭二级缓存
+    cache-enabled: false
+    # 关闭一级缓存
+    local-cache-scope: STATEMENT
+
+
+# Knife4j/Swagger 配置
+springdoc:
+  api-docs:
+    enabled: true
+    path: /v3/api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+
+# Knife4j 增强配置
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
+    swagger-model-name: 实体类列表
+#
+request:
+  log:
+    ignore-classes:
+      - com.mtd.st.controller.HealthController
+    ignore-methods:
+      - com.mtd.st.controller.HealthController.ping
+      - com.mtd.st.controller.HealthController.heartbeat

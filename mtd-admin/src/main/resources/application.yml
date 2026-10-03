@@ -5,6 +5,10 @@ spring:
   application:
     name: mtd-admin
   
+  threads:
+    virtual:
+      enabled: true
+  
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
     url: jdbc:mysql://localhost:3306/mtd_admin?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
