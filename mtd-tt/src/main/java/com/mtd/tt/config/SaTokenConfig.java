@@ -13,7 +13,7 @@ public class SaTokenConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         registry.addInterceptor(new SaInterceptor(handle -> {
             SaRouter.match("/**")
-                    .notMatch("/auth/passwordLogin", "/auth/emailCodeLogin", "/auth/sendEmailCode")
+                    .notMatch("/auth/passwordLogin", "/auth/emailCodeLogin", "/auth/sendEmailCode", "/auth/register")
                     .notMatch("/doc.html", "/swagger-ui.html", "/v3/api-docs/**", "/webjars/**")
                     .check(r -> {});
         })).addPathPatterns("/**");

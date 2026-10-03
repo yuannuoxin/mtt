@@ -35,5 +35,8 @@ public class UserEntity extends BaseEntity {
     private OffsetDateTime createdAt;
     private OffsetDateTime updatedAt;
     private OffsetDateTime deletedAt;
-    private Integer userPrivate ;
+    /**
+     *  user_private: 是否私密账号
+     */
+    private Boolean userPrivate;
 }
