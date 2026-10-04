@@ -7,6 +7,7 @@ import com.mtd.common.core.exception.BusinessException;
 import com.mtd.common.core.result.Result;
 import com.mtd.common.core.result.ResultCode;
 import com.mtd.tt.model.req.PresignUploadReq;
+import com.mtd.tt.model.resp.FileUploadResp;
 import com.mtd.tt.service.FileStorageService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -34,14 +35,14 @@ public class FileController {
     @Operation(summary = "上传文件（multipart/form-data，字段名 file）")
     @PostMapping("/upload")
     @SaCheckLogin
-    public Result<String> upload(@RequestParam("file") MultipartFile file) {
+    public Result<FileUploadResp> upload(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "上传文件不能为空");
         }
         String objectKey = buildObjectKey(file.getOriginalFilename());
         try {
             String url = fileStorageService.upload(objectKey, file.getInputStream(), file.getSize(), file.getContentType());
-            return Result.success(url);
+            return Result.success(toResp(url));
         } catch (IOException e) {
             throw new BusinessException(ResultCode.ERROR.getCode(), "读取上传文件失败: " + e.getMessage());
         }
@@ -50,12 +51,18 @@ public class FileController {
     @Operation(summary = "获取预签名上传地址（返回 PUT 直传 URL）")
     @PostMapping("/presignUpload")
     @SaCheckLogin
-    public Result<String> presignUpload(@RequestBody PresignUploadReq req) {
+    public Result<FileUploadResp> presignUpload(@RequestBody PresignUploadReq req) {
         if (StrUtil.isBlank(req.getFileName())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "fileName 不能为空");
         }
         String objectKey = buildObjectKey(req.getFileName());
-        return Result.success(fileStorageService.presignUploadUrl(objectKey, req.getContentType()));
+        return Result.success(toResp(fileStorageService.presignUploadUrl(objectKey, req.getContentType())));
+    }
+
+    private FileUploadResp toResp(String url) {
+        FileUploadResp resp = new FileUploadResp();
+        resp.setUrl(url);
+        return resp;
     }
 
     private String buildObjectKey(String fileName) {
