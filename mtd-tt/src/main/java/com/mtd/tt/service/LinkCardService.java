@@ -30,6 +30,12 @@ public class LinkCardService {
     private static final Pattern BILI_VIDEO = Pattern.compile("bilibili\\.com/video/(BV[0-9A-Za-z]+)|b23\\.tv/(BV[0-9A-Za-z]+)", Pattern.CASE_INSENSITIVE);
     /** youtube：youtube.com/watch?v= 或 youtu.be/ */
     private static final Pattern YT_VIDEO = Pattern.compile("(?:youtube\\.com/(?:watch\\?.*v=|embed/|shorts/)|youtu\\.be/)([0-9A-Za-z_-]{11})", Pattern.CASE_INSENSITIVE);
+    /** tiktok：tiktok.com/@user/video/{id} */
+    private static final Pattern TIKTOK_VIDEO = Pattern.compile("tiktok\\.com/@[^/]+/video/([0-9]+)", Pattern.CASE_INSENSITIVE);
+    /** douyin：douyin.com/video/{id}（v.douyin.com 短链无法解析 ID，跳过） */
+    private static final Pattern DOUYIN_VIDEO = Pattern.compile("douyin\\.com/video/([0-9]+)", Pattern.CASE_INSENSITIVE);
+    /** instagram：instagram.com/reel/{shortcode} 或 /p/{shortcode} */
+    private static final Pattern INSTAGRAM_VIDEO = Pattern.compile("instagram\\.com/(?:reel|p)/([A-Za-z0-9_-]+)", Pattern.CASE_INSENSITIVE);
 
     /** 从正文提取第一个 http(s) 链接，无则返回 null */
     public String extractUrl(String content) {
@@ -117,7 +123,7 @@ public class LinkCardService {
         return StrUtil.trimToNull(v);
     }
 
-    /** 识别 bilibili / youtube 视频；命中返回 [provider, videoId]，否则 null */
+    /** 识别第三方视频平台；命中返回 [provider, videoId]，否则 null */
     private String[] detectVideo(String url) {
         Matcher bili = BILI_VIDEO.matcher(url);
         if (bili.find()) {
@@ -127,6 +133,18 @@ public class LinkCardService {
         Matcher yt = YT_VIDEO.matcher(url);
         if (yt.find()) {
             return new String[]{VideoProviderEnum.YOUTUBE.getCode(), yt.group(1)};
+        }
+        Matcher tk = TIKTOK_VIDEO.matcher(url);
+        if (tk.find()) {
+            return new String[]{VideoProviderEnum.TIKTOK.getCode(), tk.group(1)};
+        }
+        Matcher dy = DOUYIN_VIDEO.matcher(url);
+        if (dy.find()) {
+            return new String[]{VideoProviderEnum.DOUYIN.getCode(), dy.group(1)};
+        }
+        Matcher ig = INSTAGRAM_VIDEO.matcher(url);
+        if (ig.find()) {
+            return new String[]{VideoProviderEnum.INSTAGRAM.getCode(), ig.group(1)};
         }
         return null;
     }

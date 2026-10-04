@@ -11,12 +11,15 @@ import lombok.Getter;
 public enum VideoProviderEnum {
 
     BILIBILI("bilibili", "哔哩哔哩"),
-    YOUTUBE("youtube", "YouTube");
+    YOUTUBE("youtube", "YouTube"),
+    DOUYIN("douyin", "抖音"),
+    TIKTOK("tiktok", "TikTok"),
+    INSTAGRAM("instagram", "Instagram");
 
     private final String code;
     private final String desc;
 
-    public static final String OPTIONS = "bilibili/youtube";
+    public static final String OPTIONS = "bilibili/youtube/douyin/tiktok/instagram";
 
     public static VideoProviderEnum of(String code) {
         if (code == null) {
