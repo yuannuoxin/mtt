@@ -16,6 +16,11 @@
     <name>mtd-iam</name>
     <description>MTD Identity and Access Management Module</description>
 
+    <properties>
+        <web3j.version>4.9.4</web3j.version>
+        <bitcoinj.version>0.16.2</bitcoinj.version>
+    </properties>
+
     <dependencies>
         <!-- MTD Common -->
         <dependency>
@@ -99,8 +104,35 @@
             <artifactId>spring-boot-starter-test</artifactId>
             <scope>test</scope>
         </dependency>
-    </dependencies>
 
+        <dependency>
+            <groupId>org.dromara.sms4j</groupId>
+            <artifactId>sms4j-email-jakarta-core</artifactId>
+            <version>3.3.5</version>
+        </dependency>
+
+        <!-- Web3j Core for Ethereum interaction -->
+        <dependency>
+            <groupId>org.web3j</groupId>
+            <artifactId>core</artifactId>
+            <version>${web3j.version}</version>
+        </dependency>
+
+        <!-- Web3j Crypto for Wallet generation -->
+        <dependency>
+            <groupId>org.web3j</groupId>
+            <artifactId>crypto</artifactId>
+            <version>${web3j.version}</version>
+        </dependency>
+
+        <!-- Bitcoinj for BIP39 Mnemonic Generation -->
+        <dependency>
+            <groupId>org.bitcoinj</groupId>
+            <artifactId>bitcoinj-core</artifactId>
+            <version>${bitcoinj.version}</version>
+        </dependency>
+
+    </dependencies>
     <build>
         <finalName>${project.artifactId}-${project.version}-${git.branch}-${git.commit.id.abbrev}-${maven.build.timestamp}</finalName>
         <resources>

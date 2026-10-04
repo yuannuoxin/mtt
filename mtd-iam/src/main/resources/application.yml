@@ -1,5 +1,5 @@
-server:
-  port: 8081
+#server:
+#  port: 8081
 
 spring:
   application:
@@ -46,3 +46,15 @@ knife4j:
   enable: true
   setting:
     language: zh_cn
+#
+server:
+  port: 443
+  ssl:
+    enabled: true
+    # 直接使用你的证书文件，不需要转换
+    certificate: C:\code\Jetbrains-Help\src\main\resources\external\certificate\ca.crt
+    certificate-private-key: C:\code\Jetbrains-Help\src\main\resources\external\certificate\private.key
+    # 协议类型
+    protocol: TLS
+    # 证书类型
+    type: X.509
