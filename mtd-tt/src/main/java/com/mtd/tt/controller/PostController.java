@@ -79,6 +79,13 @@ public class PostController {
         return Result.success(postService.search(req.getKeyword(), LoginUtil.currentUserId(), req));
     }
 
+    @Operation(summary = "上报已看（列表页点图片查看原图 / 播放视频音频）")
+    @PostMapping("/view")
+    public Result<Void> view(@RequestBody PostIdReq req) {
+        postService.recordView(req.getPostId());
+        return Result.success();
+    }
+
     @Operation(summary = "点赞")
     @PostMapping("/like")
     public Result<Void> like(@RequestBody PostIdReq req) {

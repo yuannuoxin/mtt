@@ -37,6 +37,7 @@ import com.mtd.tt.enums.NotificationTypeEnum;
 import com.mtd.tt.enums.PostTypeEnum;
 import com.mtd.tt.enums.PostVisibilityEnum;
 import com.mtd.tt.enums.ReplyPermissionEnum;
+import com.mtd.tt.util.RedisPostCounter;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -76,6 +77,8 @@ public class PostService {
     private UserService userService;
     @Autowired
     private NotificationService notificationService;
+    @Autowired
+    private RedisPostCounter redisCounter;
 
     /**
      * 创建帖子（original / reply / quote / repost）
@@ -207,17 +210,19 @@ public class PostService {
             postLinkCardMapper.insertSelective(card);
         }
 
-        // 更新被引用帖计数 + 生成通知
+        // 更新被引用帖计数 + 生成通知（计数走 Redis，不再每次 UPDATE posts 表）
         if (referenced != null) {
             switch (typeEnum) {
                 case REPLY -> {
-                    referenced.setReplyCount(safeInc(referenced.getReplyCount()));
-                    postMapper.update(referenced);
+                    redisCounter.incr(referenced.getId(), RedisPostCounter.REPLY);
                     notify(referenced.getUserId(), currentUserId, NotificationTypeEnum.COMMENT.getCode(), referenced.getId());
                 }
                 case QUOTE, REPOST -> {
-                    referenced.setRepostCount(safeInc(referenced.getRepostCount()));
-                    postMapper.update(referenced);
+                    if (typeEnum == PostTypeEnum.REPOST) {
+                        redisCounter.addUser(referenced.getId(), RedisPostCounter.REPOST, currentUserId); // SADD + 计数 +1
+                    } else {
+                        redisCounter.incr(referenced.getId(), RedisPostCounter.REPOST); // quote 仅计数 +1
+                    }
                     notify(referenced.getUserId(), currentUserId, NotificationTypeEnum.REPOST.getCode(), referenced.getId());
                 }
                 default -> {
@@ -257,9 +262,17 @@ public class PostService {
     public PostResp postDetail(Long postId, Long currentUserId) {
         PostEntity post = getActivePost(postId);
         checkViewPermission(post, currentUserId);
-        post.setViewCount(safeInc(post.getViewCount()));
-        postMapper.update(post);
+        redisCounter.incr(postId, RedisPostCounter.VIEW); // 浏览计数走 Redis
         return buildPostResp(post, currentUserId);
+    }
+
+    /**
+     * 上报"已看"：前端在列表页点击图片查看原图、播放视频/音频时调用，
+     * 与打开详情页一样累加浏览计数（游客也可调用，不计权限）。
+     */
+    public void recordView(Long postId) {
+        getActivePost(postId);
+        redisCounter.incr(postId, RedisPostCounter.VIEW);
     }
 
     /**
@@ -339,19 +352,14 @@ public class PostService {
     public void like(Long currentUserId, Long postId) {
         requireLogin(currentUserId);
         PostEntity post = getActivePost(postId);
-        PostLikeEntity exist = postLikeMapper.selectOneByQuery(
-                QueryWrapper.create()
-                        .eq(PostLikeEntity::getUserId, currentUserId)
-                        .eq(PostLikeEntity::getPostId, postId));
-        if (exist != null) {
+        if (redisCounter.hasUser(postId, RedisPostCounter.LIKE, currentUserId)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "已点赞");
         }
         PostLikeEntity like = new PostLikeEntity();
         like.setUserId(currentUserId);
         like.setPostId(postId);
-        postLikeMapper.insertSelective(like);
-        post.setLikeCount(safeInc(post.getLikeCount()));
-        postMapper.update(post);
+        postLikeMapper.insertSelective(like); // DB 持久
+        redisCounter.addUser(postId, RedisPostCounter.LIKE, currentUserId); // Redis 计数 + 关系
         notify(post.getUserId(), currentUserId, NotificationTypeEnum.LIKE.getCode(), postId);
     }
 
@@ -361,7 +369,7 @@ public class PostService {
     @Transactional(rollbackFor = Exception.class)
     public void unlike(Long currentUserId, Long postId) {
         requireLogin(currentUserId);
-        PostEntity post = getActivePost(postId);
+        getActivePost(postId);
         PostLikeEntity exist = postLikeMapper.selectOneByQuery(
                 QueryWrapper.create()
                         .eq(PostLikeEntity::getUserId, currentUserId)
@@ -370,8 +378,7 @@ public class PostService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "未点赞");
         }
         postLikeMapper.deleteById(exist.getId());
-        post.setLikeCount(Math.max(0, safeDec(post.getLikeCount())));
-        postMapper.update(post);
+        redisCounter.removeUser(postId, RedisPostCounter.LIKE, currentUserId);
     }
 
     /**
@@ -380,20 +387,15 @@ public class PostService {
     @Transactional(rollbackFor = Exception.class)
     public void bookmark(Long currentUserId, Long postId) {
         requireLogin(currentUserId);
-        PostEntity post = getActivePost(postId);
-        BookmarkEntity exist = bookmarkMapper.selectOneByQuery(
-                QueryWrapper.create()
-                        .eq(BookmarkEntity::getUserId, currentUserId)
-                        .eq(BookmarkEntity::getPostId, postId));
-        if (exist != null) {
+        getActivePost(postId);
+        if (redisCounter.hasUser(postId, RedisPostCounter.BOOKMARK, currentUserId)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "已收藏");
         }
         BookmarkEntity bookmark = new BookmarkEntity();
         bookmark.setUserId(currentUserId);
         bookmark.setPostId(postId);
-        bookmarkMapper.insertSelective(bookmark);
-        post.setBookmarkCount(safeInc(post.getBookmarkCount()));
-        postMapper.update(post);
+        bookmarkMapper.insertSelective(bookmark); // DB 持久
+        redisCounter.addUser(postId, RedisPostCounter.BOOKMARK, currentUserId);
     }
 
     /**
@@ -402,7 +404,7 @@ public class PostService {
     @Transactional(rollbackFor = Exception.class)
     public void unbookmark(Long currentUserId, Long postId) {
         requireLogin(currentUserId);
-        PostEntity post = getActivePost(postId);
+        getActivePost(postId);
         BookmarkEntity exist = bookmarkMapper.selectOneByQuery(
                 QueryWrapper.create()
                         .eq(BookmarkEntity::getUserId, currentUserId)
@@ -411,8 +413,7 @@ public class PostService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "未收藏");
         }
         bookmarkMapper.deleteById(exist.getId());
-        post.setBookmarkCount(Math.max(0, safeDec(post.getBookmarkCount())));
-        postMapper.update(post);
+        redisCounter.removeUser(postId, RedisPostCounter.BOOKMARK, currentUserId);
     }
 
     /**
@@ -474,6 +475,10 @@ public class PostService {
      * 构建帖子 VO
      */
     private PostResp buildPostResp(PostEntity post, Long currentUserId) {
+        return buildPostResp(post, currentUserId, 0);
+    }
+
+    private PostResp buildPostResp(PostEntity post, Long currentUserId, int depth) {
         PostResp resp = new PostResp();
         resp.setId(post.getId());
         resp.setUserId(post.getUserId());
@@ -487,11 +492,11 @@ public class PostService {
         resp.setHasImage(post.getHasImage());
         resp.setHasVideo(post.getHasVideo());
         resp.setReplyPermission(post.getReplyPermission());
-        resp.setLikeCount(post.getLikeCount());
-        resp.setReplyCount(post.getReplyCount());
-        resp.setRepostCount(post.getRepostCount());
-        resp.setViewCount(post.getViewCount());
-        resp.setBookmarkCount(post.getBookmarkCount());
+        resp.setLikeCount(redisCounter.getCount(post.getId(), RedisPostCounter.LIKE, post.getLikeCount()));
+        resp.setReplyCount(redisCounter.getCount(post.getId(), RedisPostCounter.REPLY, post.getReplyCount()));
+        resp.setRepostCount(redisCounter.getCount(post.getId(), RedisPostCounter.REPOST, post.getRepostCount()));
+        resp.setViewCount(redisCounter.getCount(post.getId(), RedisPostCounter.VIEW, post.getViewCount()));
+        resp.setBookmarkCount(redisCounter.getCount(post.getId(), RedisPostCounter.BOOKMARK, post.getBookmarkCount()));
         resp.setHotScore(post.getHotScore());
         resp.setCreatedAt(post.getCreatedAt());
 
@@ -517,17 +522,25 @@ public class PostService {
                 QueryWrapper.create().eq(PostLinkCardEntity::getPostId, post.getId()));
         resp.setLinkCard(card == null ? null : toLinkCardResp(card));
 
-        // 当前用户视角
+        // 当前用户视角：登录即可查真实状态（含本人，同推特）；游客一律 false
         boolean self = currentUserId != null && currentUserId.equals(post.getUserId());
         resp.setIsMine(self);
-        if (currentUserId != null && !self) {
-            resp.setIsLiked(isLiked(currentUserId, post.getId()));
-            resp.setIsBookmarked(isBookmarked(currentUserId, post.getId()));
-            resp.setIsReposted(isReposted(currentUserId, post.getId()));
+        if (currentUserId != null) {
+            resp.setIsLiked(redisCounter.hasUser(post.getId(), RedisPostCounter.LIKE, currentUserId));
+            resp.setIsBookmarked(redisCounter.hasUser(post.getId(), RedisPostCounter.BOOKMARK, currentUserId));
+            resp.setIsReposted(redisCounter.hasUser(post.getId(), RedisPostCounter.REPOST, currentUserId));
         } else {
             resp.setIsLiked(false);
             resp.setIsBookmarked(false);
             resp.setIsReposted(false);
+        }
+
+        // 被引用/被回复的原文帖子（reply/quote/repost 时返回，限制一层避免深层递归）
+        if (depth < 1 && post.getReferencedPostId() != null) {
+            PostEntity ref = postMapper.selectOneById(post.getReferencedPostId());
+            if (ref != null) {
+                resp.setReferencedPost(buildPostResp(ref, currentUserId, depth + 1));
+            }
         }
         return resp;
     }
@@ -574,29 +587,6 @@ public class PostService {
         return r;
     }
 
-    private boolean isLiked(Long userId, Long postId) {
-        return postLikeMapper.selectCountByQuery(
-                QueryWrapper.create()
-                        .eq(PostLikeEntity::getUserId, userId)
-                        .eq(PostLikeEntity::getPostId, postId)) > 0;
-    }
-
-    private boolean isBookmarked(Long userId, Long postId) {
-        return bookmarkMapper.selectCountByQuery(
-                QueryWrapper.create()
-                        .eq(BookmarkEntity::getUserId, userId)
-                        .eq(BookmarkEntity::getPostId, postId)) > 0;
-    }
-
-    private boolean isReposted(Long userId, Long postId) {
-        return postMapper.selectCountByQuery(
-                QueryWrapper.create()
-                        .eq(PostEntity::getUserId, userId)
-                        .eq(PostEntity::getType, PostTypeEnum.REPOST.getCode())
-                        .eq(PostEntity::getReferencedPostId, postId)
-                        .isNull(PostEntity::getDeletedAt)) > 0;
-    }
-
     /**
      * 可见性校验：followers_only 仅作者本人与关注者可见
      */
@@ -636,13 +626,5 @@ public class PostService {
             return;
         }
         notificationService.create(receiverUserId, triggerUserId, type, postId);
-    }
-
-    private long safeInc(Long v) {
-        return (v == null ? 0L : v) + 1;
-    }
-
-    private long safeDec(Long v) {
-        return (v == null ? 0L : v) - 1;
     }
 }

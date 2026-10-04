@@ -31,6 +31,9 @@ public class PostResp implements Serializable {
     @Parameter(description = "被引用帖子ID")
     private Long referencedPostId;
 
+    @Parameter(description = "被引用/被回复的原文帖子（reply/quote/repost 时返回，一层）")
+    private PostResp referencedPost;
+
     @Parameter(description = "根帖子ID")
     private Long rootPostId;
 
