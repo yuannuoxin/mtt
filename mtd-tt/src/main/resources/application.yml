@@ -22,6 +22,20 @@ spring:
       password: 08a5e78a38a9417ab8ec91c9d2c31c19
       database: 0
 
+  servlet:
+    multipart:
+      max-file-size: 20MB
+      max-request-size: 22MB
+
+# MinIO 文件存储
+minio:
+  endpoint: http://103.117.139.151:9000
+  access-key: hj8HDPGvGfslurciteeZ
+  secret-key: p1f53RdMA9f4KgMfK82d1hLYJki9ZAzEYENXtePX
+  bucket: "001"
+  region: cn-east-1
+  presign-expiry-seconds: 3600
+
 # Sa-Token 配置
 sa-token:
   # token 名称（同时也是 cookie 名称）
