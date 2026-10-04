@@ -15,6 +15,7 @@ import com.mtd.tt.model.req.RegisterReq;
 import com.mtd.tt.model.resp.LoginResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.UserStatusEnum;
+import com.mtd.tt.util.LoginUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -140,7 +141,10 @@ public class AuthService {
      * 当前登录用户信息
      */
     public UserProfileResp currentUserInfo() {
-        Long userId = StpUtil.getLoginIdAsLong();
+        Long userId = LoginUtil.currentUserId();
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "请先登录");
+        }
         return userService.getProfile(userId, userId);
     }
 

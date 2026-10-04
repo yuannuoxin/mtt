@@ -1,12 +1,11 @@
 package com.mtd.tt.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
-import cn.dev33.satoken.stp.StpUtil;
 import com.mtd.common.core.request.PageRequest;
 import com.mtd.common.core.response.PageResponse;
 import com.mtd.common.core.result.Result;
 import com.mtd.tt.model.resp.NotificationResp;
 import com.mtd.tt.service.NotificationService;
+import com.mtd.tt.util.LoginUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -30,23 +29,20 @@ public class NotificationController {
 
     @Operation(summary = "通知列表")
     @PostMapping("/list")
-    @SaCheckLogin
     public Result<PageResponse<NotificationResp>> list(@RequestBody PageRequest req) {
-        return Result.success(notificationService.list(StpUtil.getLoginIdAsLong(), req));
+        return Result.success(notificationService.list(LoginUtil.currentUserId(), req));
     }
 
     @Operation(summary = "全部标记已读")
     @PostMapping("/markAllRead")
-    @SaCheckLogin
     public Result<Void> markAllRead() {
-        notificationService.markAllRead(StpUtil.getLoginIdAsLong());
+        notificationService.markAllRead(LoginUtil.currentUserId());
         return Result.success();
     }
 
     @Operation(summary = "未读通知数量")
     @PostMapping("/unreadCount")
-    @SaCheckLogin
     public Result<Map<String, Long>> unreadCount() {
-        return Result.success(Map.of("count", notificationService.unreadCount(StpUtil.getLoginIdAsLong())));
+        return Result.success(Map.of("count", notificationService.unreadCount(LoginUtil.currentUserId())));
     }
 }

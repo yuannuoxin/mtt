@@ -55,6 +55,9 @@ import java.util.stream.Collectors;
 @Service
 public class PostService {
 
+    /** 单帖图片上限 */
+    private static final int MAX_IMAGES = 4;
+
     @Autowired
     private PostMapper postMapper;
     @Autowired
@@ -79,6 +82,7 @@ public class PostService {
      */
     @Transactional(rollbackFor = Exception.class)
     public PostResp createPost(Long currentUserId, CreatePostReq req) {
+        requireLogin(currentUserId);
         String type = StrUtil.isBlank(req.getType()) ? PostTypeEnum.ORIGINAL.getCode() : req.getType();
         PostTypeEnum typeEnum = PostTypeEnum.of(type);
         if (typeEnum == null) {
@@ -128,15 +132,48 @@ public class PostService {
 
         // 媒体
         if (hasMedia) {
+            // 校验类型与数量：图片最多4张；视频/音频合计最多1个；图片与音视频互斥
+            long imgCount = req.getMedias().stream()
+                    .filter(m -> MediaTypeEnum.IMAGE.getCode().equals(m.getMediaType())).count();
+            long nonImgCount = req.getMedias().stream()
+                    .filter(m -> MediaTypeEnum.VIDEO.getCode().equals(m.getMediaType())
+                            || MediaTypeEnum.AUDIO.getCode().equals(m.getMediaType())).count();
+            if (imgCount > MAX_IMAGES) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "图片最多上传 " + MAX_IMAGES + " 张");
+            }
+            if (nonImgCount > 1) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "视频/音频最多上传 1 个");
+            }
+            if (imgCount > 0 && nonImgCount > 0) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "图片与音视频不能同时上传");
+            }
             for (CreatePostMediaReq item : req.getMedias()) {
-                if (StrUtil.isBlank(item.getOriginalUrl())) {
-                    throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "媒体缺少 originalUrl");
+                String mediaType = item.getMediaType();
+                if (!MediaTypeEnum.IMAGE.getCode().equals(mediaType)
+                        && !MediaTypeEnum.VIDEO.getCode().equals(mediaType)
+                        && !MediaTypeEnum.AUDIO.getCode().equals(mediaType)) {
+                    throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "不支持的媒体类型: " + mediaType);
+                }
+                if (MediaTypeEnum.IMAGE.getCode().equals(mediaType) && StrUtil.isBlank(item.getOriginalUrl())) {
+                    throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "图片缺少 originalUrl");
+                }
+                if (MediaTypeEnum.VIDEO.getCode().equals(mediaType)) {
+                    if (StrUtil.isBlank(item.getPlayUrl())) {
+                        throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "视频缺少 playUrl");
+                    }
+                    if (StrUtil.isBlank(item.getOriginalUrl())) {
+                        throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "视频缺少封面 originalUrl");
+                    }
+                }
+                if (MediaTypeEnum.AUDIO.getCode().equals(mediaType) && StrUtil.isBlank(item.getPlayUrl())) {
+                    throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "音频缺少 playUrl");
                 }
                 PostMediaEntity media = new PostMediaEntity();
                 media.setPostId(postId);
                 media.setMediaType(item.getMediaType());
-                media.setOriginalUrl(item.getOriginalUrl());
-                media.setThumbnailUrl(item.getThumbnailUrl());
+                // audio 无封面，置空串满足 DB NOT NULL；渲染时按 mediaType 走 playUrl
+                media.setOriginalUrl(StrUtil.nullToEmpty(item.getOriginalUrl()));
+                media.setThumbnailUrl(StrUtil.nullToEmpty(item.getThumbnailUrl()));
                 media.setPlayUrl(item.getPlayUrl());
                 media.setWidth(item.getWidth());
                 media.setHeight(item.getHeight());
@@ -205,6 +242,7 @@ public class PostService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void deletePost(Long currentUserId, Long postId) {
+        requireLogin(currentUserId);
         PostEntity post = getActivePost(postId);
         if (!post.getUserId().equals(currentUserId)) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "只能删除自己的帖子");
@@ -243,10 +281,24 @@ public class PostService {
      * 首页关注时间线（关注的人 + 自己）
      */
     public PageResponse<PostResp> homeTimeline(Long currentUserId, PageRequest page) {
+        if (currentUserId == null) {
+            // 未登录：关注流为空（全量最新推文走 globalTimeline）
+            return PageResponse.of(page.getPageNum(), page.getPageSize(), 0L, List.of());
+        }
         List<Long> followingIds = userService.followingUserIds(currentUserId);
         followingIds.add(currentUserId);
         QueryWrapper wrapper = QueryWrapper.create()
                 .in(PostEntity::getUserId, followingIds)
+                .isNull(PostEntity::getDeletedAt)
+                .orderBy(PostEntity::getCreatedAt, false);
+        return pagedPosts(wrapper, page, currentUserId);
+    }
+
+    /**
+     * 全量最新推文（不区分关注，类似推特 Latest）
+     */
+    public PageResponse<PostResp> globalTimeline(Long currentUserId, PageRequest page) {
+        QueryWrapper wrapper = QueryWrapper.create()
                 .isNull(PostEntity::getDeletedAt)
                 .orderBy(PostEntity::getCreatedAt, false);
         return pagedPosts(wrapper, page, currentUserId);
@@ -285,6 +337,7 @@ public class PostService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void like(Long currentUserId, Long postId) {
+        requireLogin(currentUserId);
         PostEntity post = getActivePost(postId);
         PostLikeEntity exist = postLikeMapper.selectOneByQuery(
                 QueryWrapper.create()
@@ -307,6 +360,7 @@ public class PostService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void unlike(Long currentUserId, Long postId) {
+        requireLogin(currentUserId);
         PostEntity post = getActivePost(postId);
         PostLikeEntity exist = postLikeMapper.selectOneByQuery(
                 QueryWrapper.create()
@@ -325,6 +379,7 @@ public class PostService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void bookmark(Long currentUserId, Long postId) {
+        requireLogin(currentUserId);
         PostEntity post = getActivePost(postId);
         BookmarkEntity exist = bookmarkMapper.selectOneByQuery(
                 QueryWrapper.create()
@@ -346,6 +401,7 @@ public class PostService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void unbookmark(Long currentUserId, Long postId) {
+        requireLogin(currentUserId);
         PostEntity post = getActivePost(postId);
         BookmarkEntity exist = bookmarkMapper.selectOneByQuery(
                 QueryWrapper.create()
@@ -363,6 +419,7 @@ public class PostService {
      * 我的收藏列表
      */
     public PageResponse<PostResp> myBookmarks(Long currentUserId, PageRequest page) {
+        requireLogin(currentUserId);
         Page<BookmarkEntity> p = bookmarkMapper.paginate(page.getPageNum(), page.getPageSize(),
                 QueryWrapper.create()
                         .eq(BookmarkEntity::getUserId, currentUserId)
@@ -402,6 +459,15 @@ public class PostService {
                 .filter(ObjectUtil::isNotNull)
                 .collect(Collectors.toList());
         return PageResponse.of((int) p.getPageNumber(), (int) p.getPageSize(), p.getTotalRow(), list);
+    }
+
+    /**
+     * 写操作前置校验：未登录抛出业务异常
+     */
+    private void requireLogin(Long currentUserId) {
+        if (currentUserId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "请先登录");
+        }
     }
 
     /**
@@ -486,6 +552,14 @@ public class PostService {
         r.setTargetId(m.getTargetId());
         r.setStartIdx(m.getStartIdx());
         r.setEndIdx(m.getEndIdx());
+        // user 提及：补充被 @ 用户的用户名与昵称，便于前端展示与跳转
+        if (MentionTypeEnum.USER.getCode().equals(m.getMentionType()) && m.getTargetId() != null) {
+            UserEntity u = userMapper.selectOneById(m.getTargetId());
+            if (u != null) {
+                r.setTargetUsername(u.getUsername());
+                r.setTargetNickname(u.getNickname());
+            }
+        }
         return r;
     }
 

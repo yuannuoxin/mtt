@@ -54,6 +54,9 @@ public class NotificationService {
      * 通知列表
      */
     public PageResponse<NotificationResp> list(Long currentUserId, PageRequest page) {
+        if (currentUserId == null) {
+            return PageResponse.of(page.getPageNum(), page.getPageSize(), 0L, List.of());
+        }
         Page<NotificationEntity> p = notificationMapper.paginate(page.getPageNum(), page.getPageSize(),
                 QueryWrapper.create()
                         .eq(NotificationEntity::getReceiverUserId, currentUserId)
@@ -69,6 +72,9 @@ public class NotificationService {
      * 全部标记已读
      */
     public void markAllRead(Long currentUserId) {
+        if (currentUserId == null) {
+            return;
+        }
         List<NotificationEntity> unread = notificationMapper.selectListByQuery(
                 QueryWrapper.create()
                         .eq(NotificationEntity::getReceiverUserId, currentUserId)
@@ -83,6 +89,9 @@ public class NotificationService {
      * 未读通知数量
      */
     public long unreadCount(Long currentUserId) {
+        if (currentUserId == null) {
+            return 0;
+        }
         Long cnt = notificationMapper.selectCountByQuery(
                 QueryWrapper.create()
                         .eq(NotificationEntity::getReceiverUserId, currentUserId)

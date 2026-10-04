@@ -1,6 +1,5 @@
 package com.mtd.tt.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.hutool.core.util.IdUtil;
 import cn.hutool.core.util.StrUtil;
 import com.mtd.common.core.exception.BusinessException;
@@ -34,7 +33,6 @@ public class FileController {
 
     @Operation(summary = "上传文件（multipart/form-data，字段名 file）")
     @PostMapping("/upload")
-    @SaCheckLogin
     public Result<FileUploadResp> upload(@RequestParam("file") MultipartFile file) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "上传文件不能为空");
@@ -50,7 +48,6 @@ public class FileController {
 
     @Operation(summary = "获取预签名上传地址（返回 PUT 直传 URL）")
     @PostMapping("/presignUpload")
-    @SaCheckLogin
     public Result<FileUploadResp> presignUpload(@RequestBody PresignUploadReq req) {
         if (StrUtil.isBlank(req.getFileName())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "fileName 不能为空");

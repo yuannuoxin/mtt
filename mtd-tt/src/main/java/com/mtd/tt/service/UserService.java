@@ -57,6 +57,7 @@ public class UserService {
      * 修改个人资料
      */
     public UserProfileResp updateProfile(Long currentUserId, UpdateProfileReq req) {
+        requireLogin(currentUserId);
         UserEntity user = getActiveUser(currentUserId);
         if (StrUtil.isNotBlank(req.getNickname())) {
             user.setNickname(req.getNickname());
@@ -81,6 +82,7 @@ public class UserService {
      * 关注用户
      */
     public void follow(Long currentUserId, Long followeeId) {
+        requireLogin(currentUserId);
         checkNotSelf(currentUserId, followeeId);
         getActiveUser(followeeId);
         if (isBlocked(followeeId, currentUserId)) {
@@ -99,6 +101,7 @@ public class UserService {
      * 取消关注
      */
     public void unfollow(Long currentUserId, Long followeeId) {
+        requireLogin(currentUserId);
         FollowEntity follow = followMapper.selectOneByQuery(
                 QueryWrapper.create()
                         .eq(FollowEntity::getFollowerId, currentUserId)
@@ -141,6 +144,7 @@ public class UserService {
      * 拉黑用户
      */
     public void block(Long currentUserId, Long blockedUserId) {
+        requireLogin(currentUserId);
         checkNotSelf(currentUserId, blockedUserId);
         getActiveUser(blockedUserId);
         BlockEntity exist = blockMapper.selectOneByQuery(
@@ -163,6 +167,7 @@ public class UserService {
      * 取消拉黑
      */
     public void unblock(Long currentUserId, Long blockedUserId) {
+        requireLogin(currentUserId);
         BlockEntity exist = blockMapper.selectOneByQuery(
                 QueryWrapper.create()
                         .eq(BlockEntity::getUserId, currentUserId)
@@ -300,6 +305,12 @@ public class UserService {
                         .eq(BlockEntity::getUserId, userId)
                         .eq(BlockEntity::getBlockedUserId, blockedUserId));
         return cnt != null && cnt > 0;
+    }
+
+    private void requireLogin(Long currentUserId) {
+        if (currentUserId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "请先登录");
+        }
     }
 
     private void checkNotSelf(Long currentUserId, Long targetId) {

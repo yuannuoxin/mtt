@@ -1,6 +1,5 @@
 package com.mtd.tt.controller;
 
-import cn.dev33.satoken.annotation.SaCheckLogin;
 import com.mtd.common.core.result.Result;
 import com.mtd.tt.model.req.EmailCodeLoginReq;
 import com.mtd.tt.model.req.PasswordLoginReq;
@@ -55,7 +54,6 @@ public class AuthController {
 
     @Operation(summary = "退出登录")
     @PostMapping("/logout")
-    @SaCheckLogin
     public Result<Void> logout() {
         authService.logout();
         return Result.success();
@@ -63,7 +61,6 @@ public class AuthController {
 
     @Operation(summary = "获取当前登录用户信息")
     @PostMapping("/userInfo")
-    @SaCheckLogin
     public Result<UserProfileResp> userInfo() {
         return Result.success(authService.currentUserInfo());
     }
