@@ -68,6 +68,8 @@ public class PostService {
     @Autowired
     private PostLinkCardMapper postLinkCardMapper;
     @Autowired
+    private LinkCardService linkCardService;
+    @Autowired
     private PostLikeMapper postLikeMapper;
     @Autowired
     private BookmarkMapper bookmarkMapper;
@@ -198,16 +200,27 @@ public class PostService {
             }
         }
 
-        // 链接卡片
+        // 链接卡片：优先使用调用方显式传入的卡片；否则从正文自动提取链接并解析生成
         if (req.getLinkCard() != null) {
             PostLinkCardEntity card = new PostLinkCardEntity();
             card.setPostId(postId);
             card.setCardType(StrUtil.blankToDefault(req.getLinkCard().getCardType(), CardTypeEnum.LINK.getCode()));
             card.setTargetUrl(req.getLinkCard().getTargetUrl());
+            card.setTitle(req.getLinkCard().getTitle());
+            card.setDescription(req.getLinkCard().getDescription());
             card.setVideoProvider(req.getLinkCard().getVideoProvider());
             card.setVideoId(req.getLinkCard().getVideoId());
             card.setCoverMediaUrl(req.getLinkCard().getCoverMediaUrl());
             postLinkCardMapper.insertSelective(card);
+        } else {
+            String cardUrl = linkCardService.extractUrl(req.getContent());
+            if (StrUtil.isNotBlank(cardUrl)) {
+                PostLinkCardEntity card = linkCardService.resolve(cardUrl);
+                if (card != null) {
+                    card.setPostId(postId);
+                    postLinkCardMapper.insertSelective(card);
+                }
+            }
         }
 
         // 更新被引用帖计数 + 生成通知（计数走 Redis，不再每次 UPDATE posts 表）
@@ -581,6 +594,8 @@ public class PostService {
         r.setId(c.getId());
         r.setCardType(c.getCardType());
         r.setTargetUrl(c.getTargetUrl());
+        r.setTitle(c.getTitle());
+        r.setDescription(c.getDescription());
         r.setVideoProvider(c.getVideoProvider());
         r.setVideoId(c.getVideoId());
         r.setCoverMediaUrl(c.getCoverMediaUrl());

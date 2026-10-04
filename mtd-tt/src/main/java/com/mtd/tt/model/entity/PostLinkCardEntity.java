@@ -16,6 +16,8 @@ public class PostLinkCardEntity extends BaseEntity {
     private Long postId;
     private String cardType;
     private String targetUrl;
+    private String title;
+    private String description;
     private String videoProvider;
     private String videoId;
     private String coverMediaUrl;

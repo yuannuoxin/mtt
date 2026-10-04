@@ -17,6 +17,10 @@ public class CreatePostLinkCardReq implements Serializable {
     private String cardType;
     @Parameter(description = "目标链接")
     private String targetUrl;
+    @Parameter(description = "页面标题")
+    private String title;
+    @Parameter(description = "页面描述")
+    private String description;
     @Parameter(description = "视频平台，可选值：bilibili/youtube（见 VideoProviderEnum）")
     private String videoProvider;
     @Parameter(description = "第三方视频ID")

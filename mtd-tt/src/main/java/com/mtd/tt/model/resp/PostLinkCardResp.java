@@ -20,6 +20,12 @@ public class PostLinkCardResp implements Serializable {
     @Parameter(description = "目标链接")
     private String targetUrl;
 
+    @Parameter(description = "页面标题")
+    private String title;
+
+    @Parameter(description = "页面描述")
+    private String description;
+
     @Parameter(description = "视频平台：bilibili/youtube")
     private String videoProvider;
 

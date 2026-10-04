@@ -171,6 +171,8 @@ CREATE TABLE post_link_cards
     post_id         BIGINT      NOT NULL,
     card_type       VARCHAR(20) NOT NULL DEFAULT 'link', -- 枚举 link / embed_video
     target_url      TEXT NULL,
+    title           VARCHAR(255) NULL,                   -- 页面标题（og:title）
+    description     VARCHAR(1000) NULL,                  -- 页面描述（og:description）
     video_provider  VARCHAR(20) NULL,                    -- 枚举 bilibili / youtube，仅card_type=embed_video生效
     video_id        VARCHAR(255) NULL,                   -- 第三方视频ID，仅card_type=embed_video生效
     cover_media_url TEXT NULL,
