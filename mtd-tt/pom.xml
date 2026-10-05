@@ -84,6 +84,13 @@
             <artifactId>hutool-all</artifactId>
         </dependency>
 
+        <!-- JavaMail 标准库：Hutool MailUtil 发送邮件所需（javax.mail API） -->
+        <dependency>
+            <groupId>com.sun.mail</groupId>
+            <artifactId>javax.mail</artifactId>
+            <version>1.6.2</version>
+        </dependency>
+
         <!-- jsoup：解析外部链接页面的 OG 元信息，用于生成链接卡片 -->
         <dependency>
             <groupId>org.jsoup</groupId>

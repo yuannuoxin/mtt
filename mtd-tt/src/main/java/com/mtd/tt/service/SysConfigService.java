@@ -53,6 +53,10 @@ public class SysConfigService {
     private JdbcTemplate jdbcTemplate;
 
     private final Map<String, String> cache = new ConcurrentHashMap<>();
+    /** 缓存最后加载时间戳，超过间隔则自动从库刷新，支持直接改库即时生效 */
+    private volatile long lastReload = 0;
+    private static final long RELOAD_INTERVAL_MS = 30_000;
+    private final Object reloadLock = new Object();
 
     @PostConstruct
     public void init() {
@@ -66,6 +70,17 @@ public class SysConfigService {
         }
     }
 
+    /** 缓存过期则重新从库加载（防抖），保证直接改库也能生效 */
+    private void refreshIfStale() {
+        if (System.currentTimeMillis() - lastReload > RELOAD_INTERVAL_MS) {
+            synchronized (reloadLock) {
+                if (System.currentTimeMillis() - lastReload > RELOAD_INTERVAL_MS) {
+                    reloadCache();
+                }
+            }
+        }
+    }
+
     private void reloadCache() {
         cache.clear();
         List<SysConfigEntity> all = sysConfigMapper.selectListByQuery(
@@ -75,12 +90,14 @@ public class SysConfigService {
                 cache.put(c.getCfgKey(), c.getCfgValue());
             }
         }
+        lastReload = System.currentTimeMillis();
     }
 
     /**
      * 读取配置，不存在返回 null
      */
     public String get(String key) {
+        refreshIfStale();
         return cache.get(key);
     }
 
@@ -88,6 +105,7 @@ public class SysConfigService {
      * 读取布尔配置（true/false 或 1/0），默认值兜底
      */
     public boolean getBool(String key, boolean def) {
+        refreshIfStale();
         String v = cache.get(key);
         if (v == null) {
             return def;

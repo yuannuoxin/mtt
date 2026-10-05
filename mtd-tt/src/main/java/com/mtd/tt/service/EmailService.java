@@ -25,6 +25,7 @@ public class EmailService {
 
     /**
      * 发送邮箱验证码；未启用邮件或 SMTP 未配置时降级为日志输出（不阻塞流程）。
+     * 已启用时异步发信，避免 SMTP 慢导致接口阻塞。
      */
     public void sendCode(String to, String code) {
         if (!isEnabled()) {
@@ -40,24 +41,27 @@ public class EmailService {
         String username = StrUtil.nullToEmpty(configService.get("email.smtp.username"));
         String password = StrUtil.nullToEmpty(configService.get("email.smtp.password"));
         String from = StrUtil.nullToEmpty(configService.get("email.smtp.from"));
-        try {
-            String content = "您的验证码是：" + code + "，5 分钟内有效，请勿泄露给他人。";
-            if (StrUtil.isBlank(from)) {
-                from = username;
-            }
-            MailAccount account = new MailAccount();
-            account.setHost(host);
-            account.setPort(parsePort(port));
-            account.setAuth(true);
-            account.setSslEnable(true);
-            account.setFrom(from);
-            account.setUser(username);
-            account.setPass(password);
-            MailUtil.send(account, to, "【MTT】邮箱验证码", content, false);
-            log.info("[邮箱验证码] 已发送到 {}", to);
-        } catch (Exception e) {
-            log.error("[邮箱验证码] 发送失败: {}", e.getMessage(), e);
+        if (StrUtil.isBlank(from)) {
+            from = username;
         }
+        String fromFinal = from;
+        String content = "您的验证码是：" + code + "，5 分钟内有效，请勿泄露给他人。";
+        Thread.ofVirtual().name("mtt-mail-").start(() -> {
+            try {
+                MailAccount account = new MailAccount();
+                account.setHost(host);
+                account.setPort(parsePort(port));
+                account.setAuth(true);
+                account.setSslEnable(true);
+                account.setFrom(fromFinal);
+                account.setUser(username);
+                account.setPass(password);
+                MailUtil.send(account, to, "【MTT】邮箱验证码", content, false);
+                log.info("[邮箱验证码] 已发送到 {}", to);
+            } catch (Exception e) {
+                log.error("[邮箱验证码] 发送失败: {}", e.getMessage(), e);
+            }
+        });
     }
 
     private int parsePort(String port) {
