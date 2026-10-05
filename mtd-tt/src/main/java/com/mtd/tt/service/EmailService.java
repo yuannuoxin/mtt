@@ -3,6 +3,8 @@ package com.mtd.tt.service;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.extra.mail.MailAccount;
 import cn.hutool.extra.mail.MailUtil;
+import com.mtd.common.core.exception.BusinessException;
+import com.mtd.common.core.result.ResultCode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -24,8 +26,9 @@ public class EmailService {
     }
 
     /**
-     * 发送邮箱验证码；未启用邮件或 SMTP 未配置时降级为日志输出（不阻塞流程）。
-     * 已启用时异步发信，避免 SMTP 慢导致接口阻塞。
+     * 发送邮箱验证码。
+     * 未启用邮件或 SMTP 未配置时降级为日志输出；已启用时同步发信（带短超时），
+     * 投递失败直接抛出业务异常，让调用方感知"没发出去"，避免假装成功。
      */
     public void sendCode(String to, String code) {
         if (!isEnabled()) {
@@ -44,24 +47,25 @@ public class EmailService {
         if (StrUtil.isBlank(from)) {
             from = username;
         }
-        String fromFinal = from;
         String content = "您的验证码是：" + code + "，5 分钟内有效，请勿泄露给他人。";
-        Thread.ofVirtual().name("mtt-mail-").start(() -> {
-            try {
-                MailAccount account = new MailAccount();
-                account.setHost(host);
-                account.setPort(parsePort(port));
-                account.setAuth(true);
-                account.setSslEnable(true);
-                account.setFrom(fromFinal);
-                account.setUser(username);
-                account.setPass(password);
-                MailUtil.send(account, to, "【MTT】邮箱验证码", content, false);
-                log.info("[邮箱验证码] 已发送到 {}", to);
-            } catch (Exception e) {
-                log.error("[邮箱验证码] 发送失败: {}", e.getMessage(), e);
-            }
-        });
+        MailAccount account = new MailAccount();
+        account.setHost(host);
+        account.setPort(parsePort(port));
+        account.setAuth(true);
+        account.setSslEnable(true);
+        account.setFrom(from);
+        account.setUser(username);
+        account.setPass(password);
+        // 短超时，避免 SMTP 慢时接口长时间阻塞
+        account.setConnectionTimeout(8000);
+        account.setTimeout(8000);
+        try {
+            MailUtil.send(account, to, "【MTT】邮箱验证码", content, false);
+            log.info("[邮箱验证码] 已发送到 {}", to);
+        } catch (Exception e) {
+            log.error("[邮箱验证码] 发送失败: {}", e.getMessage(), e);
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "验证码发送失败，请稍后重试或检查邮箱服务配置");
+        }
     }
 
     private int parsePort(String port) {
