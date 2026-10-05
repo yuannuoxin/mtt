@@ -38,6 +38,7 @@ import com.mtd.tt.enums.MediaTypeEnum;
 import com.mtd.tt.enums.MentionTypeEnum;
 import com.mtd.tt.enums.NotificationTypeEnum;
 import com.mtd.tt.enums.PostTypeEnum;
+import com.mtd.tt.enums.PostTypeWeightEnum;
 import com.mtd.tt.enums.PostVisibilityEnum;
 import com.mtd.tt.enums.ReplyPermissionEnum;
 import com.mtd.tt.enums.UserTimelineItemTypeEnum;
@@ -145,8 +146,9 @@ public class PostService {
         post.setRepostCount(0L);
         post.setViewCount(0L);
         post.setBookmarkCount(0L);
-        // 热度分从 0 起，互动累加；排序时按"互动热度 + 时间衰减"实时计算，新帖靠 created_at/id 兜底
-        post.setHotScore(0L);
+        // 基础热度 = 帖子类型权重（原帖>引用>回复>转发），互动在此基础上累加；
+        // 排序时再叠加时间衰减，避免回复/转发这类低价值内容占据太多展示位
+        post.setHotScore(PostTypeWeightEnum.of(type).getBase());
         postMapper.insertSelective(post);
         Long postId = post.getId();
 
@@ -380,12 +382,13 @@ public class PostService {
     }
 
     /**
-     * 全量最新推文（id 倒序 + 游标分页，不区分关注，类似推特 Latest）
+     * 全量推荐推文（按热度 = 类型权重+互动，叠加时间衰减倒序；id 兜底）
+     * 回复/转发基础热度低，天然排在后面，避免首页被回复等低价值内容占据。
      */
     public PageResponse<PostResp> globalTimeline(Long currentUserId, PageRequest page, Long maxId) {
         QueryWrapper wrapper = QueryWrapper.create()
                 .isNull(PostEntity::getDeletedAt)
-                .orderBy(PostEntity::getId, false);
+                .orderByUnSafely("(hot_score / POWER(EXTRACT(EPOCH FROM (now() - created_at)) / 3600.0 + 2, 1.8)) DESC, id DESC");
         return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
     }
 
