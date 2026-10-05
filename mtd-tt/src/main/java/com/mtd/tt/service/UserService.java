@@ -197,6 +197,10 @@ public class UserService {
                         .and(w -> {
                             w.where(UserEntity::getUsername).like(keyword)
                                     .or(UserEntity::getNickname).like(keyword);
+                            // 纯数字关键词也按 userId 匹配，便于 @数字 方式直接引用某个用户（如 @3 命中 userId=3）
+                            if (StrUtil.isNumeric(keyword)) {
+                                w.or(UserEntity::getId).eq(Long.parseLong(keyword));
+                            }
                         })
                         .orderBy(UserEntity::getId, true));
         List<Long> ids = p.getRecords().stream().map(UserEntity::getId).collect(Collectors.toList());
