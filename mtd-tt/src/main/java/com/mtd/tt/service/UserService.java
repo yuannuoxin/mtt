@@ -45,6 +45,8 @@ public class UserService {
     private PostMapper postMapper;
     @Autowired
     private TimelineService timelineService;
+    @Autowired
+    private TurnstileService turnstileService;
 
     /**
      * 获取用户资料（含关系与统计）
@@ -62,6 +64,7 @@ public class UserService {
      */
     public UserProfileResp updateProfile(Long currentUserId, UpdateProfileReq req) {
         requireLogin(currentUserId);
+        turnstileService.verify(req.getTurnstileToken());
         UserEntity user = getActiveUser(currentUserId);
         if (StrUtil.isNotBlank(req.getNickname())) {
             user.setNickname(req.getNickname());

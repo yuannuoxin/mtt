@@ -8,6 +8,7 @@ import com.mtd.tt.model.req.SendEmailCodeReq;
 import com.mtd.tt.model.resp.LoginResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.service.AuthService;
+import com.mtd.tt.service.TurnstileService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,8 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 /**
  * 认证接口：注册 / 登录 / 登出 / 当前用户
@@ -26,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
     private final AuthService authService;
+    private final TurnstileService turnstileService;
 
     @Operation(summary = "账号密码登录")
     @PostMapping("/passwordLogin")
@@ -42,8 +46,14 @@ public class AuthController {
     @Operation(summary = "发送邮箱验证码")
     @PostMapping("/sendEmailCode")
     public Result<Void> sendEmailCode(@RequestBody SendEmailCodeReq req) {
-        authService.sendEmailCode(req.getEmail());
+        authService.sendEmailCode(req);
         return Result.success();
+    }
+
+    @Operation(summary = "Turnstile 前端配置（是否启用 + siteKey + 邮箱验证码开关）")
+    @PostMapping("/turnstileConfig")
+    public Result<Map<String, Object>> turnstileConfig() {
+        return Result.success(turnstileService.publicConfig());
     }
 
     @Operation(summary = "邮箱验证码登录")

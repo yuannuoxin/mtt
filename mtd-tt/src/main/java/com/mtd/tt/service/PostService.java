@@ -81,6 +81,8 @@ public class PostService {
     @Autowired
     private LinkCardService linkCardService;
     @Autowired
+    private TurnstileService turnstileService;
+    @Autowired
     private PostLikeMapper postLikeMapper;
     @Autowired
     private BookmarkMapper bookmarkMapper;
@@ -103,6 +105,7 @@ public class PostService {
     @Transactional(rollbackFor = Exception.class)
     public PostResp createPost(Long currentUserId, CreatePostReq req) {
         requireLogin(currentUserId);
+        turnstileService.verify(req.getTurnstileToken());
         String type = StrUtil.isBlank(req.getType()) ? PostTypeEnum.ORIGINAL.getCode() : req.getType();
         PostTypeEnum typeEnum = PostTypeEnum.of(type);
         if (typeEnum == null) {

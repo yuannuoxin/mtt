@@ -14,4 +14,7 @@ public class SendEmailCodeReq extends BaseRequest {
 
     @Parameter(description = "邮箱", required = true)
     private String email;
+
+    @Parameter(description = "Turnstile 人机校验 token（后端启用 Turnstile 时必填）")
+    private String turnstileToken;
 }

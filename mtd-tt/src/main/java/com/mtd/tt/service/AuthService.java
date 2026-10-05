@@ -12,6 +12,7 @@ import com.mtd.tt.model.entity.UserEntity;
 import com.mtd.tt.model.req.EmailCodeLoginReq;
 import com.mtd.tt.model.req.PasswordLoginReq;
 import com.mtd.tt.model.req.RegisterReq;
+import com.mtd.tt.model.req.SendEmailCodeReq;
 import com.mtd.tt.model.resp.LoginResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.UserStatusEnum;
@@ -40,13 +41,22 @@ public class AuthService {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
+    @Autowired
+    private TurnstileService turnstileService;
+
+    @Autowired
+    private EmailService emailService;
+
     private static final String EMAIL_CODE_PREFIX = "tt:login:email:code:";
+    private static final String EMAIL_CODE_FREQ_PREFIX = "tt:login:email:freq:";
     private static final long CODE_EXPIRE_MINUTES = 5;
+    private static final long FREQ_LIMIT_SECONDS = 60;
 
     /**
      * 密码登录（用户名或邮箱 + 密码）
      */
     public LoginResp passwordLogin(PasswordLoginReq req) {
+        turnstileService.verify(req.getTurnstileToken());
         if (StrUtil.isBlank(req.getAccount()) || StrUtil.isBlank(req.getPassword())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "账号和密码不能为空");
         }
@@ -62,9 +72,22 @@ public class AuthService {
      * 注册
      */
     public LoginResp register(RegisterReq req) {
+        turnstileService.verify(req.getTurnstileToken());
         if (StrUtil.isBlank(req.getUsername()) || StrUtil.isBlank(req.getNickname())
                 || StrUtil.isBlank(req.getEmail()) || StrUtil.isBlank(req.getPassword())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "用户名、昵称、邮箱、密码均不能为空");
+        }
+        // 邮箱验证码注册：启用时校验验证码；开发期关闭则跳过（便利）
+        if (emailService.isEnabled()) {
+            if (StrUtil.isBlank(req.getEmailCode())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请输入邮箱验证码");
+            }
+            String cacheKey = EMAIL_CODE_PREFIX + req.getEmail();
+            String cachedCode = redisTemplate.opsForValue().get(cacheKey);
+            if (cachedCode == null || !cachedCode.equals(req.getEmailCode())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "邮箱验证码错误或已过期");
+            }
+            redisTemplate.delete(cacheKey);
         }
         // 用户名唯一校验
         UserEntity byUsername = userMapper.selectOneByQuery(
@@ -91,20 +114,22 @@ public class AuthService {
     }
 
     /**
-     * 发送邮箱验证码
+     * 发送邮箱验证码（注册/登录通用；启用 Turnstile 时前端需带 token）
      */
-    public void sendEmailCode(String email) {
-        if (StrUtil.isBlank(email)) {
+    public void sendEmailCode(SendEmailCodeReq req) {
+        turnstileService.verify(req.getTurnstileToken());
+        if (StrUtil.isBlank(req.getEmail())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "邮箱不能为空");
         }
-        UserEntity user = userMapper.selectOneByQuery(
-                QueryWrapper.create().eq(UserEntity::getEmail, email));
-        if (user == null) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该邮箱未注册");
+        // 60 秒冷却，防止刷验证码
+        Boolean ok = redisTemplate.opsForValue()
+                .setIfAbsent(EMAIL_CODE_FREQ_PREFIX + req.getEmail(), "1", FREQ_LIMIT_SECONDS, TimeUnit.SECONDS);
+        if (Boolean.FALSE.equals(ok)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "验证码发送过于频繁，请稍后再试");
         }
         String code = RandomUtil.randomNumbers(6);
-        redisTemplate.opsForValue().set(EMAIL_CODE_PREFIX + email, code, CODE_EXPIRE_MINUTES, TimeUnit.MINUTES);
-        log.info("邮箱验证码: {}, 邮箱: {}", code, email);
+        redisTemplate.opsForValue().set(EMAIL_CODE_PREFIX + req.getEmail(), code, CODE_EXPIRE_MINUTES, TimeUnit.MINUTES);
+        emailService.sendCode(req.getEmail(), code);
     }
 
     /**
