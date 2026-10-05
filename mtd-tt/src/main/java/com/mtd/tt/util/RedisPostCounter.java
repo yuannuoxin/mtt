@@ -48,6 +48,33 @@ public class RedisPostCounter {
         return "tt:post:" + postId + ":users:" + action;
     }
 
+    /** 互动热度累计 key：tt:post:{postId}:hot（存未落库的热度增量） */
+    private String hotKey(Long postId) {
+        return "tt:post:" + postId + ":hot";
+    }
+
+    /**
+     * 互动热度累加（Redis 增量，不直接写库）。返回累加后的值。
+     * 达到挡位阈值后由调用方取出并落库，避免高频互动频繁 UPDATE posts 表。
+     */
+    public long incrHot(Long postId, long delta) {
+        Long v = redis.opsForValue().increment(hotKey(postId), delta);
+        return v == null ? 0 : v;
+    }
+
+    /** 取出并清零热度增量（挡位落库 / 每日兜底落库用），无 key 返回 null */
+    public Long getAndResetHot(Long postId) {
+        String v = redis.opsForValue().getAndDelete(hotKey(postId));
+        if (v == null) {
+            return null;
+        }
+        try {
+            return Long.parseLong(v);
+        } catch (NumberFormatException e) {
+            return 0L;
+        }
+    }
+
     /** 计数 +1，返回最新值 */
     public long incr(Long postId, String action) {
         Long v = redis.opsForValue().increment(cntKey(postId, action));

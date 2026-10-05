@@ -106,5 +106,57 @@ public class PostCountSyncTask {
             }
         }
         log.info("Redis 计数同步完成，更新帖子数={}", updated);
+
+        syncHotScores();
+    }
+
+    /**
+     * 把 Redis 中未达挡位而残留的热度增量兜底落库（每天凌晨执行一次），保证热度最终一致。
+     */
+    private void syncHotScores() {
+        Set<String> hotKeys;
+        try {
+            hotKeys = redis.keys("tt:post:*:hot");
+        } catch (Exception e) {
+            log.warn("热度同步失败（读取 keys 异常）：{}", e.getMessage());
+            return;
+        }
+        if (CollUtil.isEmpty(hotKeys)) {
+            return;
+        }
+        int updated = 0;
+        for (String key : hotKeys) {
+            // tt:post:{postId}:hot
+            String[] parts = key.split(":");
+            if (parts.length < 4) {
+                continue;
+            }
+            Long postId;
+            try {
+                postId = Long.parseLong(parts[2]);
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            String raw = redis.opsForValue().getAndDelete(key);
+            if (raw == null) {
+                continue;
+            }
+            Long delta;
+            try {
+                delta = Long.parseLong(raw);
+            } catch (NumberFormatException e) {
+                continue;
+            }
+            if (delta == 0) {
+                continue;
+            }
+            try {
+                postMapper.updateHotScore(postId, delta);
+                updated++;
+            } catch (Exception ex) {
+                log.warn("热度同步：帖子 {} 更新失败：{}", postId, ex.getMessage());
+            }
+        }
+        log.info("热度同步完成，更新帖子数={}", updated);
     }
 }

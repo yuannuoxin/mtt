@@ -63,6 +63,12 @@ public class PostService {
     /** 单帖图片上限 */
     private static final int MAX_IMAGES = 4;
 
+    /**
+     * 热度落库挡位：互动热度先在 Redis 累计，达到该阈值才写一次 DB。
+     * 点赞权重10分，即约10次点赞才触发一次落库，降低高频互动对数据库的写压力。
+     */
+    private static final long HOT_FLUSH_THRESHOLD = 100;
+
     @Autowired
     private PostMapper postMapper;
     @Autowired
@@ -139,8 +145,8 @@ public class PostService {
         post.setRepostCount(0L);
         post.setViewCount(0L);
         post.setBookmarkCount(0L);
-        // 热度分初始 = 当前时间戳（毫秒），保证新帖在搜索里天然靠前，后续互动再累加
-        post.setHotScore(System.currentTimeMillis());
+        // 热度分从 0 起，互动累加；排序时按"互动热度 + 时间衰减"实时计算，新帖靠 created_at/id 兜底
+        post.setHotScore(0L);
         postMapper.insertSelective(post);
         Long postId = post.getId();
 
@@ -237,7 +243,7 @@ public class PostService {
             switch (typeEnum) {
                 case REPLY -> {
                     redisCounter.incr(referenced.getId(), RedisPostCounter.REPLY);
-                    postMapper.updateHotScore(referenced.getId(), HotScoreWeightEnum.REPLY.getWeight());
+                    addHot(referenced.getId(), HotScoreWeightEnum.REPLY.getWeight());
                     notify(referenced.getUserId(), currentUserId, NotificationTypeEnum.COMMENT.getCode(), referenced.getId());
                 }
                 case QUOTE, REPOST -> {
@@ -246,7 +252,7 @@ public class PostService {
                     } else {
                         redisCounter.incr(referenced.getId(), RedisPostCounter.REPOST); // quote 仅计数 +1
                     }
-                    postMapper.updateHotScore(referenced.getId(), HotScoreWeightEnum.REPOST.getWeight());
+                    addHot(referenced.getId(), HotScoreWeightEnum.REPOST.getWeight());
                     notify(referenced.getUserId(), currentUserId, NotificationTypeEnum.REPOST.getCode(), referenced.getId());
                 }
                 default -> {
@@ -409,7 +415,9 @@ public class PostService {
     }
 
     /**
-     * 搜索帖子（正文模糊匹配，热度分倒序 + id 倒序 + 游标分页）
+     * 搜索帖子（正文模糊匹配，热度按"互动分 + 时间衰减"倒序 + 游标分页）
+     * <p>排序分 = hot_score / (距发布小时数 + 2)^1.8：
+     * 互动越多、越新越靠前；很久以前的数据即使曾很热，也会随时间指数衰减。
      */
     public PageResponse<PostResp> search(String keyword, Long currentUserId, PageRequest page, Long maxId) {
         if (StrUtil.isBlank(keyword)) {
@@ -418,8 +426,7 @@ public class PostService {
         QueryWrapper wrapper = QueryWrapper.create()
                 .like(PostEntity::getContent, keyword)
                 .isNull(PostEntity::getDeletedAt)
-                .orderBy(PostEntity::getHotScore, false)
-                .orderBy(PostEntity::getId, false);
+                .orderByUnSafely("(hot_score / POWER(EXTRACT(EPOCH FROM (now() - created_at)) / 3600.0 + 2, 1.8)) DESC, id DESC");
         return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
     }
 
@@ -438,7 +445,7 @@ public class PostService {
         like.setPostId(postId);
         postLikeMapper.insertSelective(like); // DB 持久
         redisCounter.addUser(postId, RedisPostCounter.LIKE, currentUserId); // Redis 计数 + 关系
-        postMapper.updateHotScore(postId, HotScoreWeightEnum.LIKE.getWeight()); // 热度累加
+        addHot(postId, HotScoreWeightEnum.LIKE.getWeight()); // 热度挡位累加
         notify(post.getUserId(), currentUserId, NotificationTypeEnum.LIKE.getCode(), postId);
     }
 
@@ -458,7 +465,7 @@ public class PostService {
         }
         postLikeMapper.deleteById(exist.getId());
         redisCounter.removeUser(postId, RedisPostCounter.LIKE, currentUserId);
-        postMapper.updateHotScore(postId, -HotScoreWeightEnum.LIKE.getWeight()); // 热度回退
+        addHot(postId, -HotScoreWeightEnum.LIKE.getWeight()); // 热度回退
     }
 
     /**
@@ -476,7 +483,7 @@ public class PostService {
         bookmark.setPostId(postId);
         bookmarkMapper.insertSelective(bookmark); // DB 持久
         redisCounter.addUser(postId, RedisPostCounter.BOOKMARK, currentUserId);
-        postMapper.updateHotScore(postId, HotScoreWeightEnum.BOOKMARK.getWeight()); // 热度累加
+        addHot(postId, HotScoreWeightEnum.BOOKMARK.getWeight()); // 热度挡位累加
     }
 
     /**
@@ -495,7 +502,7 @@ public class PostService {
         }
         bookmarkMapper.deleteById(exist.getId());
         redisCounter.removeUser(postId, RedisPostCounter.BOOKMARK, currentUserId);
-        postMapper.updateHotScore(postId, -HotScoreWeightEnum.BOOKMARK.getWeight()); // 热度回退
+        addHot(postId, -HotScoreWeightEnum.BOOKMARK.getWeight()); // 热度回退
     }
 
     /**
@@ -558,6 +565,19 @@ public class PostService {
     private void requireLogin(Long currentUserId) {
         if (currentUserId == null) {
             throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "请先登录");
+        }
+    }
+
+    /**
+     * 互动热度挡位落库：先在 Redis 累计增量，达到阈值才写一次 DB 并清零，降低高频互动的写库压力。
+     */
+    private void addHot(Long postId, long delta) {
+        long acc = redisCounter.incrHot(postId, delta);
+        if (Math.abs(acc) >= HOT_FLUSH_THRESHOLD) {
+            Long flushed = redisCounter.getAndResetHot(postId);
+            if (flushed != null && flushed != 0) {
+                postMapper.updateHotScore(postId, flushed);
+            }
         }
     }
 
