@@ -14,6 +14,7 @@ import com.mtd.tt.mapper.PostMapper;
 import com.mtd.tt.mapper.PostMediaMapper;
 import com.mtd.tt.mapper.PostMentionMapper;
 import com.mtd.tt.mapper.UserMapper;
+import com.mtd.tt.mapper.UserTimelineMapper;
 import com.mtd.tt.model.entity.BookmarkEntity;
 import com.mtd.tt.model.entity.PostEntity;
 import com.mtd.tt.model.entity.PostLikeEntity;
@@ -21,6 +22,7 @@ import com.mtd.tt.model.entity.PostLinkCardEntity;
 import com.mtd.tt.model.entity.PostMediaEntity;
 import com.mtd.tt.model.entity.PostMentionEntity;
 import com.mtd.tt.model.entity.UserEntity;
+import com.mtd.tt.model.entity.UserTimelineEntity;
 import com.mtd.tt.model.req.CreatePostLinkCardReq;
 import com.mtd.tt.model.req.CreatePostMediaReq;
 import com.mtd.tt.model.req.CreatePostMentionReq;
@@ -31,12 +33,14 @@ import com.mtd.tt.model.resp.PostMentionResp;
 import com.mtd.tt.model.resp.PostResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.CardTypeEnum;
+import com.mtd.tt.enums.HotScoreWeightEnum;
 import com.mtd.tt.enums.MediaTypeEnum;
 import com.mtd.tt.enums.MentionTypeEnum;
 import com.mtd.tt.enums.NotificationTypeEnum;
 import com.mtd.tt.enums.PostTypeEnum;
 import com.mtd.tt.enums.PostVisibilityEnum;
 import com.mtd.tt.enums.ReplyPermissionEnum;
+import com.mtd.tt.enums.UserTimelineItemTypeEnum;
 import com.mtd.tt.util.RedisPostCounter;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -81,6 +85,10 @@ public class PostService {
     private NotificationService notificationService;
     @Autowired
     private RedisPostCounter redisCounter;
+    @Autowired
+    private UserTimelineMapper userTimelineMapper;
+    @Autowired
+    private TimelineService timelineService;
 
     /**
      * 创建帖子（original / reply / quote / repost）
@@ -131,7 +139,8 @@ public class PostService {
         post.setRepostCount(0L);
         post.setViewCount(0L);
         post.setBookmarkCount(0L);
-        post.setHotScore(0L);
+        // 热度分初始 = 当前时间戳（毫秒），保证新帖在搜索里天然靠前，后续互动再累加
+        post.setHotScore(System.currentTimeMillis());
         postMapper.insertSelective(post);
         Long postId = post.getId();
 
@@ -223,11 +232,12 @@ public class PostService {
             }
         }
 
-        // 更新被引用帖计数 + 生成通知（计数走 Redis，不再每次 UPDATE posts 表）
+        // 更新被引用帖计数 + 热度 + 生成通知（计数走 Redis，热度走 DB 累加）
         if (referenced != null) {
             switch (typeEnum) {
                 case REPLY -> {
                     redisCounter.incr(referenced.getId(), RedisPostCounter.REPLY);
+                    postMapper.updateHotScore(referenced.getId(), HotScoreWeightEnum.REPLY.getWeight());
                     notify(referenced.getUserId(), currentUserId, NotificationTypeEnum.COMMENT.getCode(), referenced.getId());
                 }
                 case QUOTE, REPOST -> {
@@ -236,6 +246,7 @@ public class PostService {
                     } else {
                         redisCounter.incr(referenced.getId(), RedisPostCounter.REPOST); // quote 仅计数 +1
                     }
+                    postMapper.updateHotScore(referenced.getId(), HotScoreWeightEnum.REPOST.getWeight());
                     notify(referenced.getUserId(), currentUserId, NotificationTypeEnum.REPOST.getCode(), referenced.getId());
                 }
                 default -> {
@@ -252,6 +263,9 @@ public class PostService {
             }
         }
 
+        // 发帖成功后推送到作者全部粉丝的时间线（fanout）
+        timelineService.pushOnPostCreated(post);
+
         return buildPostResp(post, currentUserId);
     }
 
@@ -267,6 +281,8 @@ public class PostService {
         }
         post.setDeletedAt(OffsetDateTime.now());
         postMapper.update(post);
+        // 从所有时间线里移除该帖
+        timelineService.clearOnPostDeleted(postId);
     }
 
     /**
@@ -289,9 +305,9 @@ public class PostService {
     }
 
     /**
-     * 某用户的帖子列表
+     * 某用户的帖子列表（id 倒序 + 游标分页）
      */
-    public PageResponse<PostResp> userPosts(Long targetUserId, PageRequest page, String postType, Long currentUserId) {
+    public PageResponse<PostResp> userPosts(Long targetUserId, PageRequest page, String postType, Long currentUserId, Long maxId) {
         userService.getProfile(targetUserId, currentUserId);
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq(PostEntity::getUserId, targetUserId)
@@ -299,39 +315,76 @@ public class PostService {
         if (StrUtil.isNotBlank(postType)) {
             wrapper.eq(PostEntity::getType, postType);
         }
-        wrapper.orderBy(PostEntity::getCreatedAt, false);
-        return pagedPosts(wrapper, page, currentUserId);
+        wrapper.orderBy(PostEntity::getId, false);
+        return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
     }
 
     /**
-     * 首页关注时间线（关注的人 + 自己）
+     * 首页关注时间线：直接读 user_timeline（关注时回填近期推文，不做全量；看全量去用户主页）
      */
-    public PageResponse<PostResp> homeTimeline(Long currentUserId, PageRequest page) {
+    public PageResponse<PostResp> homeTimeline(Long currentUserId, PageRequest page, Long maxId) {
         if (currentUserId == null) {
             // 未登录：关注流为空（全量最新推文走 globalTimeline）
             return PageResponse.of(page.getPageNum(), page.getPageSize(), 0L, List.of());
         }
-        List<Long> followingIds = userService.followingUserIds(currentUserId);
-        followingIds.add(currentUserId);
-        QueryWrapper wrapper = QueryWrapper.create()
-                .in(PostEntity::getUserId, followingIds)
-                .isNull(PostEntity::getDeletedAt)
-                .orderBy(PostEntity::getCreatedAt, false);
-        return pagedPosts(wrapper, page, currentUserId);
+        // 存量关注首次回填：时间线为空且有关注时，把已关注人的近期推文回填一次（之后靠关注/发帖增量维护）
+        ensureTimelineBackfill(currentUserId);
+        int pageSize = page.getPageSize();
+        QueryWrapper tlWrapper = QueryWrapper.create()
+                .eq(UserTimelineEntity::getUserId, currentUserId)
+                .eq(UserTimelineEntity::getItemType, UserTimelineItemTypeEnum.POST.getCode())
+                .eq(UserTimelineEntity::getValid, Boolean.TRUE)
+                .orderBy(UserTimelineEntity::getItemId, false)
+                .limit(pageSize);
+        if (maxId != null) {
+            tlWrapper.lt(UserTimelineEntity::getItemId, maxId);
+        }
+        List<UserTimelineEntity> tls = userTimelineMapper.selectListByQuery(tlWrapper);
+        List<PostResp> list = tls.stream().map(tl -> {
+                    PostEntity post = postMapper.selectOneById(tl.getItemId());
+                    if (post == null || post.getDeletedAt() != null) {
+                        return null;
+                    }
+                    try {
+                        checkViewPermission(post, currentUserId);
+                    } catch (BusinessException e) {
+                        return null;
+                    }
+                    return buildPostResp(post, currentUserId);
+                })
+                .filter(ObjectUtil::isNotNull)
+                .collect(Collectors.toList());
+        return PageResponse.of(page.getPageNum(), page.getPageSize(), (long) list.size(), list);
     }
 
     /**
-     * 全量最新推文（不区分关注，类似推特 Latest）
+     * 存量关注回填：时间线为空且有关注关系时，把已关注人（含自己）的近期推文回填一次。
+     * 之后时间线靠关注时回填 + 发帖时推送增量维护，不重复触发。
      */
-    public PageResponse<PostResp> globalTimeline(Long currentUserId, PageRequest page) {
-        QueryWrapper wrapper = QueryWrapper.create()
-                .isNull(PostEntity::getDeletedAt)
-                .orderBy(PostEntity::getCreatedAt, false);
-        return pagedPosts(wrapper, page, currentUserId);
+    private void ensureTimelineBackfill(Long userId) {
+        long cnt = userTimelineMapper.selectCountByQuery(
+                QueryWrapper.create().eq(UserTimelineEntity::getUserId, userId));
+        if (cnt > 0) {
+            return;
+        }
+        List<Long> ids = userService.followingUserIds(userId); // 关注的人 + 自己
+        for (Long id : ids) {
+            timelineService.fillOnFollow(userId, id);
+        }
     }
 
     /**
-     * 某帖子的回复列表
+     * 全量最新推文（id 倒序 + 游标分页，不区分关注，类似推特 Latest）
+     */
+    public PageResponse<PostResp> globalTimeline(Long currentUserId, PageRequest page, Long maxId) {
+        QueryWrapper wrapper = QueryWrapper.create()
+                .isNull(PostEntity::getDeletedAt)
+                .orderBy(PostEntity::getId, false);
+        return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
+    }
+
+    /**
+     * 某帖子的回复列表（id 正序分页）
      */
     public PageResponse<PostResp> replies(Long postId, Long currentUserId, PageRequest page) {
         getActivePost(postId);
@@ -339,14 +392,26 @@ public class PostService {
                 .eq(PostEntity::getReferencedPostId, postId)
                 .eq(PostEntity::getType, PostTypeEnum.REPLY.getCode())
                 .isNull(PostEntity::getDeletedAt)
-                .orderBy(PostEntity::getCreatedAt, true);
-        return pagedPosts(wrapper, page, currentUserId);
+                .orderBy(PostEntity::getId, true);
+        Page<PostEntity> p = postMapper.paginate(page.getPageNum(), page.getPageSize(), wrapper);
+        List<PostResp> list = p.getRecords().stream()
+                .map(post -> {
+                    try {
+                        checkViewPermission(post, currentUserId);
+                    } catch (BusinessException e) {
+                        return null;
+                    }
+                    return buildPostResp(post, currentUserId);
+                })
+                .filter(ObjectUtil::isNotNull)
+                .collect(Collectors.toList());
+        return PageResponse.of((int) p.getPageNumber(), (int) p.getPageSize(), p.getTotalRow(), list);
     }
 
     /**
-     * 搜索帖子（正文模糊匹配）
+     * 搜索帖子（正文模糊匹配，热度分倒序 + id 倒序 + 游标分页）
      */
-    public PageResponse<PostResp> search(String keyword, Long currentUserId, PageRequest page) {
+    public PageResponse<PostResp> search(String keyword, Long currentUserId, PageRequest page, Long maxId) {
         if (StrUtil.isBlank(keyword)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "搜索关键词不能为空");
         }
@@ -354,8 +419,8 @@ public class PostService {
                 .like(PostEntity::getContent, keyword)
                 .isNull(PostEntity::getDeletedAt)
                 .orderBy(PostEntity::getHotScore, false)
-                .orderBy(PostEntity::getCreatedAt, false);
-        return pagedPosts(wrapper, page, currentUserId);
+                .orderBy(PostEntity::getId, false);
+        return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
     }
 
     /**
@@ -373,6 +438,7 @@ public class PostService {
         like.setPostId(postId);
         postLikeMapper.insertSelective(like); // DB 持久
         redisCounter.addUser(postId, RedisPostCounter.LIKE, currentUserId); // Redis 计数 + 关系
+        postMapper.updateHotScore(postId, HotScoreWeightEnum.LIKE.getWeight()); // 热度累加
         notify(post.getUserId(), currentUserId, NotificationTypeEnum.LIKE.getCode(), postId);
     }
 
@@ -392,6 +458,7 @@ public class PostService {
         }
         postLikeMapper.deleteById(exist.getId());
         redisCounter.removeUser(postId, RedisPostCounter.LIKE, currentUserId);
+        postMapper.updateHotScore(postId, -HotScoreWeightEnum.LIKE.getWeight()); // 热度回退
     }
 
     /**
@@ -409,6 +476,7 @@ public class PostService {
         bookmark.setPostId(postId);
         bookmarkMapper.insertSelective(bookmark); // DB 持久
         redisCounter.addUser(postId, RedisPostCounter.BOOKMARK, currentUserId);
+        postMapper.updateHotScore(postId, HotScoreWeightEnum.BOOKMARK.getWeight()); // 热度累加
     }
 
     /**
@@ -427,6 +495,7 @@ public class PostService {
         }
         bookmarkMapper.deleteById(exist.getId());
         redisCounter.removeUser(postId, RedisPostCounter.BOOKMARK, currentUserId);
+        postMapper.updateHotScore(postId, -HotScoreWeightEnum.BOOKMARK.getWeight()); // 热度回退
     }
 
     /**
@@ -459,9 +528,17 @@ public class PostService {
 
     // ===================== 构建与内部工具 =====================
 
-    private PageResponse<PostResp> pagedPosts(QueryWrapper wrapper, PageRequest page, Long currentUserId) {
-        Page<PostEntity> p = postMapper.paginate(page.getPageNum(), page.getPageSize(), wrapper);
-        List<PostResp> list = p.getRecords().stream()
+    /**
+     * 游标分页：按 id 倒序取一页（maxId 为上一页最后一条的 id，取更早一页）。
+     * 不依赖传统 offset 分页，返回条数即分页判断依据（list.size() == pageSize 则还有更多）。
+     */
+    private PageResponse<PostResp> pagedPosts(QueryWrapper wrapper, Long maxId, int pageSize, Long currentUserId) {
+        if (maxId != null) {
+            wrapper.lt(PostEntity::getId, maxId);
+        }
+        wrapper.limit(pageSize);
+        List<PostEntity> records = postMapper.selectListByQuery(wrapper);
+        List<PostResp> list = records.stream()
                 .map(post -> {
                     try {
                         checkViewPermission(post, currentUserId);
@@ -472,7 +549,7 @@ public class PostService {
                 })
                 .filter(ObjectUtil::isNotNull)
                 .collect(Collectors.toList());
-        return PageResponse.of((int) p.getPageNumber(), (int) p.getPageSize(), p.getTotalRow(), list);
+        return PageResponse.of(1, pageSize, (long) list.size(), list);
     }
 
     /**

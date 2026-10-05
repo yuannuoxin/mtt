@@ -17,4 +17,7 @@ public class UserPostsReq extends PageRequest {
 
     @Parameter(description = "帖子类型过滤（original/reply/quote/repost，可不传查全部）")
     private String postType;
+
+    @Parameter(description = "游标：上一页最后一条帖子的 id（首次查询不传，取更早一页）")
+    private Long maxId;
 }

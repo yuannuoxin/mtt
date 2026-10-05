@@ -52,19 +52,19 @@ public class PostController {
     @Operation(summary = "某用户的帖子列表")
     @PostMapping("/userPosts")
     public Result<PageResponse<PostResp>> userPosts(@RequestBody UserPostsReq req) {
-        return Result.success(postService.userPosts(req.getUserId(), req, req.getPostType(), LoginUtil.currentUserId()));
+        return Result.success(postService.userPosts(req.getUserId(), req, req.getPostType(), LoginUtil.currentUserId(), req.getMaxId()));
     }
 
     @Operation(summary = "首页关注时间线（关注的人 + 自己）")
     @PostMapping("/homeTimeline")
     public Result<PageResponse<PostResp>> homeTimeline(@RequestBody HomeTimelineReq req) {
-        return Result.success(postService.homeTimeline(LoginUtil.currentUserId(), req));
+        return Result.success(postService.homeTimeline(LoginUtil.currentUserId(), req, req.getMaxId()));
     }
 
     @Operation(summary = "全量最新推文（不区分关注，类似推特 Latest）")
     @PostMapping("/globalTimeline")
     public Result<PageResponse<PostResp>> globalTimeline(@RequestBody HomeTimelineReq req) {
-        return Result.success(postService.globalTimeline(LoginUtil.currentUserId(), req));
+        return Result.success(postService.globalTimeline(LoginUtil.currentUserId(), req, req.getMaxId()));
     }
 
     @Operation(summary = "某帖子的回复列表")
@@ -76,7 +76,7 @@ public class PostController {
     @Operation(summary = "搜索帖子")
     @PostMapping("/search")
     public Result<PageResponse<PostResp>> search(@RequestBody SearchPostReq req) {
-        return Result.success(postService.search(req.getKeyword(), LoginUtil.currentUserId(), req));
+        return Result.success(postService.search(req.getKeyword(), LoginUtil.currentUserId(), req, req.getMaxId()));
     }
 
     @Operation(summary = "上报已看（列表页点图片查看原图 / 播放视频音频）")

@@ -41,6 +41,8 @@ public class UserService {
     private BlockMapper blockMapper;
     @Autowired
     private PostMapper postMapper;
+    @Autowired
+    private TimelineService timelineService;
 
     /**
      * 获取用户资料（含关系与统计）
@@ -95,6 +97,8 @@ public class UserService {
         follow.setFollowerId(currentUserId);
         follow.setFolloweeId(followeeId);
         followMapper.insertSelective(follow);
+        // 关注后：把被关注人最近 N 条推文回填到自己的时间线
+        timelineService.fillOnFollow(currentUserId, followeeId);
     }
 
     /**
@@ -110,6 +114,8 @@ public class UserService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "未关注该用户");
         }
         followMapper.deleteById(follow.getId());
+        // 取关后：把自己时间线里该人的推文移除
+        timelineService.clearOnUnfollow(currentUserId, followeeId);
     }
 
     /**

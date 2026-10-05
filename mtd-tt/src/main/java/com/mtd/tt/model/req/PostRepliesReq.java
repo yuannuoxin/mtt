@@ -14,4 +14,7 @@ public class PostRepliesReq extends PageRequest {
 
     @Parameter(description = "目标帖子ID", required = true)
     private Long postId;
+
+    @Parameter(description = "游标：上一页最后一条回复的 id（首次查询不传，取更早一页）")
+    private Long maxId;
 }
