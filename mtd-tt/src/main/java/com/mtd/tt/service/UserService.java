@@ -23,6 +23,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -191,21 +193,38 @@ public class UserService {
         if (StrUtil.isBlank(keyword)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "搜索关键词不能为空");
         }
-        Page<UserEntity> p = userMapper.paginate(page.getPageNum(), page.getPageSize(),
-                QueryWrapper.create()
-                        .eq(UserEntity::getStatus, UserStatusEnum.ACTIVE.getCode())
-                        .and(w -> {
-                            w.where(UserEntity::getUsername).like(keyword)
-                                    .or(UserEntity::getNickname).like(keyword);
-                            // 纯数字关键词也按 userId 匹配，便于 @数字 方式直接引用某个用户（如 @3 命中 userId=3）
-                            if (StrUtil.isNumeric(keyword)) {
-                                w.or(UserEntity::getId).eq(Long.parseLong(keyword));
-                            }
-                        })
-                        .orderBy(UserEntity::getId, true));
-        List<Long> ids = p.getRecords().stream().map(UserEntity::getId).collect(Collectors.toList());
+        // 精确 username 命中者强制排在结果最前，便于 @补全/@解析按用户名精确定位（如 @3 → username='3' 的用户即使 id 靠后也排最前）
+        List<UserEntity> exact = userMapper.selectListByQuery(QueryWrapper.create()
+                .eq(UserEntity::getStatus, UserStatusEnum.ACTIVE.getCode())
+                .eq(UserEntity::getUsername, keyword));
+
+        QueryWrapper fw = QueryWrapper.create()
+                .eq(UserEntity::getStatus, UserStatusEnum.ACTIVE.getCode())
+                .and(w -> {
+                    w.where(UserEntity::getUsername).like(keyword)
+                            .or(UserEntity::getNickname).like(keyword);
+                    // 纯数字关键词也按 userId 匹配，便于 @数字 方式直接引用某个用户（如 @3 命中 userId=3）
+                    if (StrUtil.isNumeric(keyword)) {
+                        w.or(UserEntity::getId).eq(Long.parseLong(keyword));
+                    }
+                })
+                .orderBy(UserEntity::getId, true);
+        List<UserEntity> fuzzy = userMapper.selectListByQuery(fw);
+
+        // 合并去重（按 id），精确 username 排最前，其余保持 id 升序
+        LinkedHashMap<Long, UserEntity> merged = new LinkedHashMap<>();
+        exact.forEach(e -> merged.put(e.getId(), e));
+        fuzzy.forEach(e -> merged.putIfAbsent(e.getId(), e));
+        List<UserEntity> all = new ArrayList<>(merged.values());
+
+        // 手动分页
+        int fromIndex = (page.getPageNum() - 1) * page.getPageSize();
+        List<UserEntity> pageRecords = all.size() > fromIndex
+                ? all.subList(fromIndex, Math.min(all.size(), fromIndex + page.getPageSize()))
+                : List.of();
+        List<Long> ids = pageRecords.stream().map(UserEntity::getId).collect(Collectors.toList());
         List<UserProfileResp> list = listProfiles(ids, currentUserId);
-        return PageResponse.of((int) p.getPageNumber(), (int) p.getPageSize(), p.getTotalRow(), list);
+        return PageResponse.of(page.getPageNum(), page.getPageSize(), (long) all.size(), list);
     }
 
     // ===================== 内部工具方法 =====================
