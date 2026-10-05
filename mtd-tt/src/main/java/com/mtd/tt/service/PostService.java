@@ -342,6 +342,8 @@ public class PostService {
                 .eq(UserTimelineEntity::getUserId, currentUserId)
                 .eq(UserTimelineEntity::getItemType, UserTimelineItemTypeEnum.POST.getCode())
                 .eq(UserTimelineEntity::getValid, Boolean.TRUE)
+                // 关注流不含自己的推文（同推特；历史残留的自己记录也一并过滤）
+                .ne(UserTimelineEntity::getItemUserId, currentUserId)
                 .orderBy(UserTimelineEntity::getItemId, false)
                 .limit(pageSize);
         if (maxId != null) {
@@ -376,6 +378,8 @@ public class PostService {
             return;
         }
         List<Long> ids = userService.followingUserIds(userId); // 关注的人 + 自己
+        // 关注流与推特一致：回填只取关注的人，排除自己
+        ids.remove(userId);
         for (Long id : ids) {
             timelineService.fillOnFollow(userId, id);
         }

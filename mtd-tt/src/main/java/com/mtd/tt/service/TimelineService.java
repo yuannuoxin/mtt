@@ -50,9 +50,8 @@ public class TimelineService {
             return;
         }
         Long authorId = post.getUserId();
+        // 关注流与推特一致：只推送给粉丝，不含作者自己（自己的推文在个人主页查看）
         List<Long> followerIds = followerUserIds(authorId);
-        // 首页关注流语义为"关注的人 + 自己"：作者自己也写入时间线
-        followerIds.add(authorId);
         if (CollUtil.isEmpty(followerIds)) {
             return;
         }
