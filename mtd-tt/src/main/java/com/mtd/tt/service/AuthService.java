@@ -136,6 +136,7 @@ public class AuthService {
      * 邮箱验证码登录
      */
     public LoginResp emailCodeLogin(EmailCodeLoginReq req) {
+        turnstileService.verify(req.getTurnstileToken());
         if (StrUtil.isBlank(req.getEmail()) || StrUtil.isBlank(req.getCode())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "邮箱和验证码不能为空");
         }

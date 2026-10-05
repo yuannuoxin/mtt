@@ -35,8 +35,13 @@ public class SysConfigService {
     private static final String INIT_SQL = """
             INSERT INTO sys_config (cfg_key, cfg_value, remark)
             VALUES ('turnstile.enabled', 'false', '是否启用 Cloudflare Turnstile 人机校验（true/false，开发期默认关闭）'),
-                   ('turnstile.site_key', '', 'Turnstile 站点 Site Key（前端渲染 widget 用）'),
-                   ('turnstile.secret_key', '', 'Turnstile 站点 Secret Key（后端 siteverify 用）'),
+                   ('turnstile.mode', 'non_interactive', 'Turnstile 模式：managed(托管/交互) / invisible(隐形) / non_interactive(非交互)'),
+                   ('turnstile.site_key', '', 'Turnstile 站点 Site Key（前端渲染 widget 用，non_interactive 模式使用）'),
+                   ('turnstile.secret_key', '', 'Turnstile 站点 Secret Key（后端 siteverify 用，non_interactive 模式使用）'),
+                   ('turnstile.managed.site_key', '', 'Turnstile 托管(Managed)模式 Site Key'),
+                   ('turnstile.managed.secret_key', '', 'Turnstile 托管(Managed)模式 Secret Key'),
+                   ('turnstile.invisible.site_key', '', 'Turnstile 隐形(Invisible)模式 Site Key'),
+                   ('turnstile.invisible.secret_key', '', 'Turnstile 隐形(Invisible)模式 Secret Key'),
                    ('email_code.enabled', 'false', '是否启用邮箱验证码注册（true/false，开发期默认关闭）'),
                    ('email.smtp.host', '', 'SMTP 主机'),
                    ('email.smtp.port', '465', 'SMTP 端口'),

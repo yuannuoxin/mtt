@@ -29,7 +29,10 @@ public class SysConfigController {
 
     /** 允许通过接口修改的配置键白名单（不含任何越权键） */
     private static final Set<String> ALLOWED_KEYS = Set.of(
-            "turnstile.enabled", "turnstile.site_key", "turnstile.secret_key",
+            "turnstile.enabled", "turnstile.mode",
+            "turnstile.site_key", "turnstile.secret_key",
+            "turnstile.managed.site_key", "turnstile.managed.secret_key",
+            "turnstile.invisible.site_key", "turnstile.invisible.secret_key",
             "email_code.enabled",
             "email.smtp.host", "email.smtp.port", "email.smtp.username",
             "email.smtp.password", "email.smtp.from");

@@ -33,8 +33,39 @@ public class TurnstileService {
         return configService.getBool("turnstile.enabled", false);
     }
 
+    /** 当前 Turnstile 模式：managed / invisible / non_interactive（非法值回退 non_interactive） */
+    public String mode() {
+        String m = StrUtil.nullToEmpty(configService.get("turnstile.mode"));
+        return switch (m) {
+            case "managed", "invisible" -> m;
+            default -> "non_interactive";
+        };
+    }
+
+    /** 按当前模式取 Site Key（前端渲染用），未配置则回退 turnstile.site_key */
     public String siteKey() {
-        return StrUtil.nullToEmpty(configService.get("turnstile.site_key"));
+        String key = switch (mode()) {
+            case "managed" -> configService.get("turnstile.managed.site_key");
+            case "invisible" -> configService.get("turnstile.invisible.site_key");
+            default -> configService.get("turnstile.site_key");
+        };
+        if (StrUtil.isBlank(key)) {
+            key = configService.get("turnstile.site_key");
+        }
+        return StrUtil.nullToEmpty(key);
+    }
+
+    /** 按当前模式取 Secret Key（后端 siteverify 用），未配置则回退 turnstile.secret_key */
+    public String secretKey() {
+        String key = switch (mode()) {
+            case "managed" -> configService.get("turnstile.managed.secret_key");
+            case "invisible" -> configService.get("turnstile.invisible.secret_key");
+            default -> configService.get("turnstile.secret_key");
+        };
+        if (StrUtil.isBlank(key)) {
+            key = configService.get("turnstile.secret_key");
+        }
+        return StrUtil.nullToEmpty(key);
     }
 
     /**
@@ -47,7 +78,7 @@ public class TurnstileService {
         if (StrUtil.isBlank(token)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "人机校验未通过，请刷新后重试");
         }
-        String secret = configService.get("turnstile.secret_key");
+        String secret = secretKey();
         Map<String, Object> body = new HashMap<>();
         body.put("secret", secret == null ? "" : secret);
         body.put("response", token);
@@ -73,6 +104,7 @@ public class TurnstileService {
     public Map<String, Object> publicConfig() {
         Map<String, Object> cfg = new LinkedHashMap<>();
         cfg.put("enabled", isEnabled());
+        cfg.put("mode", mode());
         cfg.put("siteKey", siteKey());
         cfg.put("emailCodeEnabled", configService.getBool("email_code.enabled", false));
         return cfg;

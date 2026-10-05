@@ -17,4 +17,7 @@ public class EmailCodeLoginReq extends BaseRequest {
 
     @Parameter(description = "验证码", required = true)
     private String code;
+
+    @Parameter(description = "Turnstile 人机校验 token（启用时必填）")
+    private String turnstileToken;
 }
