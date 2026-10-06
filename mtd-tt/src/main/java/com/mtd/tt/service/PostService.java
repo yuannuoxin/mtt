@@ -236,8 +236,9 @@ public class PostService {
         }
 
         // 链接卡片：优先使用调用方显式传入的卡片；否则从正文自动提取链接并解析生成
+        PostLinkCardEntity card = null;
         if (req.getLinkCard() != null) {
-            PostLinkCardEntity card = new PostLinkCardEntity();
+            card = new PostLinkCardEntity();
             card.setPostId(postId);
             card.setCardType(StrUtil.blankToDefault(req.getLinkCard().getCardType(), CardTypeEnum.LINK.getCode()));
             card.setTargetUrl(req.getLinkCard().getTargetUrl());
@@ -250,11 +251,27 @@ public class PostService {
         } else {
             String cardUrl = linkCardService.extractUrl(req.getContent());
             if (StrUtil.isNotBlank(cardUrl)) {
-                PostLinkCardEntity card = linkCardService.resolve(cardUrl);
+                card = linkCardService.resolve(cardUrl);
                 if (card != null) {
                     card.setPostId(postId);
                     postLinkCardMapper.insertSelective(card);
                 }
+            }
+        }
+        // 链接卡片媒体并入媒体标记（图片卡片=link+封面 / 视频卡片=embed_video），使媒体类型筛选能匹配到含卡片的推文
+        if (card != null) {
+            boolean lcImage = CardTypeEnum.LINK.getCode().equals(card.getCardType())
+                    && StrUtil.isNotBlank(card.getCoverMediaUrl());
+            boolean lcVideo = CardTypeEnum.EMBED_VIDEO.getCode().equals(card.getCardType());
+            if ((lcImage && !Boolean.TRUE.equals(post.getHasImage()))
+                    || (lcVideo && !Boolean.TRUE.equals(post.getHasVideo()))) {
+                if (lcImage) {
+                    post.setHasImage(true);
+                }
+                if (lcVideo) {
+                    post.setHasVideo(true);
+                }
+                postMapper.update(post);
             }
         }
 
@@ -296,7 +313,8 @@ public class PostService {
     }
 
     /**
-     * 媒体类型过滤写进 SQL（globalTimeline / userPosts 走 wrapper）
+     * 媒体类型过滤写进 SQL（globalTimeline / userPosts 走 wrapper）。
+     * 基于 posts 表的 has_image/has_video（发帖时已把正文媒体与链接卡片媒体并入）。
      */
     private void applyMediaTypeFilter(QueryWrapper wrapper, String mediaType) {
         if ("image".equals(mediaType)) {
@@ -307,16 +325,37 @@ public class PostService {
     }
 
     /**
-     * 媒体类型过滤（homeTimeline 已拉取 post 后逐条判断）
+     * 媒体类型过滤（homeTimeline 已拉取 post 后逐条判断，需额外核对链接卡片）
      */
     private boolean matchMediaType(PostEntity post, String mediaType) {
         if ("image".equals(mediaType)) {
-            return Boolean.TRUE.equals(post.getHasImage());
+            if (Boolean.TRUE.equals(post.getHasImage())) {
+                return true;
+            }
+            return hasLinkCardMedia(post.getId(), false);
         }
         if ("video".equals(mediaType)) {
-            return Boolean.TRUE.equals(post.getHasVideo());
+            if (Boolean.TRUE.equals(post.getHasVideo())) {
+                return true;
+            }
+            return hasLinkCardMedia(post.getId(), true);
         }
         return true;
+    }
+
+    /**
+     * 判断该推文是否带图片卡片（cardType=link 且封面非空）或视频卡片（cardType=embed_video）
+     */
+    private boolean hasLinkCardMedia(Long postId, boolean video) {
+        PostLinkCardEntity card = postLinkCardMapper.selectOneByQuery(
+                QueryWrapper.create().eq(PostLinkCardEntity::getPostId, postId));
+        if (card == null) {
+            return false;
+        }
+        if (video) {
+            return "embed_video".equals(card.getCardType());
+        }
+        return "link".equals(card.getCardType()) && StrUtil.isNotBlank(card.getCoverMediaUrl());
     }
 
     /**
