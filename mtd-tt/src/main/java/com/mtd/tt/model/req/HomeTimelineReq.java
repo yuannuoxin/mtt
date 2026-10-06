@@ -14,4 +14,7 @@ public class HomeTimelineReq extends PageRequest {
 
     @Parameter(description = "游标：上一页最后一条帖子的 id（首次查询不传，取更早一页）")
     private Long maxId;
+
+    @Parameter(description = "媒体类型过滤：image=仅图片 / video=仅视频 / 空或all=全部")
+    private String mediaType;
 }

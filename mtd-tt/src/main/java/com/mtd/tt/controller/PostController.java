@@ -52,19 +52,19 @@ public class PostController {
     @Operation(summary = "某用户的帖子列表")
     @PostMapping("/userPosts")
     public Result<PageResponse<PostResp>> userPosts(@RequestBody UserPostsReq req) {
-        return Result.success(postService.userPosts(req.getUserId(), req, req.getPostType(), LoginUtil.currentUserId(), req.getMaxId()));
+        return Result.success(postService.userPosts(req.getUserId(), req, req.getPostType(), LoginUtil.currentUserId(), req.getMaxId(), req.getMediaType()));
     }
 
     @Operation(summary = "首页关注时间线（关注的人 + 自己）")
     @PostMapping("/homeTimeline")
     public Result<PageResponse<PostResp>> homeTimeline(@RequestBody HomeTimelineReq req) {
-        return Result.success(postService.homeTimeline(LoginUtil.currentUserId(), req, req.getMaxId()));
+        return Result.success(postService.homeTimeline(LoginUtil.currentUserId(), req, req.getMaxId(), req.getMediaType()));
     }
 
     @Operation(summary = "全量最新推文（不区分关注，类似推特 Latest）")
     @PostMapping("/globalTimeline")
     public Result<PageResponse<PostResp>> globalTimeline(@RequestBody HomeTimelineReq req) {
-        return Result.success(postService.globalTimeline(LoginUtil.currentUserId(), req, req.getMaxId()));
+        return Result.success(postService.globalTimeline(LoginUtil.currentUserId(), req, req.getMaxId(), req.getMediaType()));
     }
 
     @Operation(summary = "某帖子的回复列表")

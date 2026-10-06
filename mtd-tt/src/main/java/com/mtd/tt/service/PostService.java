@@ -296,6 +296,30 @@ public class PostService {
     }
 
     /**
+     * 媒体类型过滤写进 SQL（globalTimeline / userPosts 走 wrapper）
+     */
+    private void applyMediaTypeFilter(QueryWrapper wrapper, String mediaType) {
+        if ("image".equals(mediaType)) {
+            wrapper.eq(PostEntity::getHasImage, true);
+        } else if ("video".equals(mediaType)) {
+            wrapper.eq(PostEntity::getHasVideo, true);
+        }
+    }
+
+    /**
+     * 媒体类型过滤（homeTimeline 已拉取 post 后逐条判断）
+     */
+    private boolean matchMediaType(PostEntity post, String mediaType) {
+        if ("image".equals(mediaType)) {
+            return Boolean.TRUE.equals(post.getHasImage());
+        }
+        if ("video".equals(mediaType)) {
+            return Boolean.TRUE.equals(post.getHasVideo());
+        }
+        return true;
+    }
+
+    /**
      * 解析客户端回传的文件 id：校验该文件确属当前用户（user_files.id + user_id），
      * 非法或不存在则返回 null（不作为归属）。
      */
@@ -361,7 +385,7 @@ public class PostService {
     /**
      * 某用户的帖子列表（id 倒序 + 游标分页）
      */
-    public PageResponse<PostResp> userPosts(Long targetUserId, PageRequest page, String postType, Long currentUserId, Long maxId) {
+    public PageResponse<PostResp> userPosts(Long targetUserId, PageRequest page, String postType, Long currentUserId, Long maxId, String mediaType) {
         userService.getProfile(targetUserId, currentUserId);
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq(PostEntity::getUserId, targetUserId)
@@ -369,6 +393,7 @@ public class PostService {
         if (StrUtil.isNotBlank(postType)) {
             wrapper.eq(PostEntity::getType, postType);
         }
+        applyMediaTypeFilter(wrapper, mediaType);
         wrapper.orderBy(PostEntity::getId, false);
         return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
     }
@@ -376,7 +401,7 @@ public class PostService {
     /**
      * 首页关注时间线：直接读 user_timeline（关注时回填近期推文，不做全量；看全量去用户主页）
      */
-    public PageResponse<PostResp> homeTimeline(Long currentUserId, PageRequest page, Long maxId) {
+    public PageResponse<PostResp> homeTimeline(Long currentUserId, PageRequest page, Long maxId, String mediaType) {
         if (currentUserId == null) {
             // 未登录：关注流为空（全量最新推文走 globalTimeline）
             return PageResponse.of(page.getPageNum(), page.getPageSize(), 0L, List.of());
@@ -399,6 +424,9 @@ public class PostService {
         List<PostResp> list = tls.stream().map(tl -> {
                     PostEntity post = postMapper.selectOneById(tl.getItemId());
                     if (post == null || post.getDeletedAt() != null) {
+                        return null;
+                    }
+                    if (!matchMediaType(post, mediaType)) {
                         return null;
                     }
                     try {
@@ -435,10 +463,11 @@ public class PostService {
      * 全量推荐推文（按热度 = 类型权重+互动，叠加时间衰减倒序；id 兜底）
      * 回复/转发基础热度低，天然排在后面，避免首页被回复等低价值内容占据。
      */
-    public PageResponse<PostResp> globalTimeline(Long currentUserId, PageRequest page, Long maxId) {
+    public PageResponse<PostResp> globalTimeline(Long currentUserId, PageRequest page, Long maxId, String mediaType) {
         QueryWrapper wrapper = QueryWrapper.create()
                 .isNull(PostEntity::getDeletedAt)
                 .orderByUnSafely("(hot_score / POWER(EXTRACT(EPOCH FROM (now() - created_at)) / 3600.0 + 2, 1.8)) DESC, id DESC");
+        applyMediaTypeFilter(wrapper, mediaType);
         return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
     }
 
