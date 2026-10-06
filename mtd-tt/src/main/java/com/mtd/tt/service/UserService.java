@@ -84,8 +84,14 @@ public class UserService {
         if (req.getAvatar() != null) {
             user.setAvatar(req.getAvatar());
         }
+        if (req.getAvatarThumb() != null) {
+            user.setAvatarThumb(req.getAvatarThumb());
+        }
         if (req.getBanner() != null) {
             user.setBanner(req.getBanner());
+        }
+        if (req.getBannerThumb() != null) {
+            user.setBannerThumb(req.getBannerThumb());
         }
         if (req.getBio() != null) {
             user.setBio(req.getBio());
@@ -338,7 +344,9 @@ public class UserService {
         // 邮箱仅本人可见：只有查看自己的资料时才返回 email，其他用户看不到
         resp.setEmail(self ? user.getEmail() : null);
         resp.setAvatar(user.getAvatar());
+        resp.setAvatarThumb(user.getAvatarThumb());
         resp.setBanner(user.getBanner());
+        resp.setBannerThumb(user.getBannerThumb());
         resp.setBio(user.getBio());
         resp.setStatus(user.getStatus());
         resp.setUserPrivate(user.getUserPrivate());

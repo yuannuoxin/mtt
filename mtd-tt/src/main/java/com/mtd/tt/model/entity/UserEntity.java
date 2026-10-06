@@ -21,9 +21,17 @@ public class UserEntity extends BaseEntity {
     private String nickname;
     private String avatar;
     /**
+     * 头像压缩图（主页先展示压缩图，点击后再看原图）
+     */
+    private String avatarThumb;
+    /**
      * 横幅大图
      */
     private String banner;
+    /**
+     * 横幅压缩图
+     */
+    private String bannerThumb;
     /**
      * 个人简介 / 个人签名
      */

@@ -27,8 +27,14 @@ public class UserProfileResp implements Serializable {
     @Parameter(description = "头像")
     private String avatar;
 
+    @Parameter(description = "头像压缩图（主页先展示压缩图，点击后再看原图）")
+    private String avatarThumb;
+
     @Parameter(description = "横幅大图")
     private String banner;
+
+    @Parameter(description = "横幅压缩图")
+    private String bannerThumb;
 
     @Parameter(description = "个人简介")
     private String bio;

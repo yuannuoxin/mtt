@@ -207,10 +207,10 @@ public class PostService {
                 media.setWidth(item.getWidth());
                 media.setHeight(item.getHeight());
                 media.setDuration(item.getDuration());
-                // 按 url 关联 user_files，并校验文件归属当前用户
-                Long originalFileId = lookupFileId(currentUserId, item.getOriginalUrl());
-                Long thumbnailFileId = lookupFileId(currentUserId, item.getThumbnailUrl());
-                Long playFileId = lookupFileId(currentUserId, item.getPlayUrl());
+                // 客户端上传后回传文件 id，后端校验归属当前用户即可（不再按 url 匹配）
+                Long originalFileId = resolveFileId(item.getOriginalFileId(), currentUserId);
+                Long thumbnailFileId = resolveFileId(item.getThumbnailFileId(), currentUserId);
+                Long playFileId = resolveFileId(item.getPlayFileId(), currentUserId);
                 media.setOriginalFileId(originalFileId);
                 media.setThumbnailFileId(thumbnailFileId);
                 media.setPlayFileId(playFileId);
@@ -296,15 +296,16 @@ public class PostService {
     }
 
     /**
-     * 按 url + 当前用户 查找文件记录 id（校验归属：只认当前用户自己上传的文件）。
+     * 解析客户端回传的文件 id：校验该文件确属当前用户（user_files.id + user_id），
+     * 非法或不存在则返回 null（不作为归属）。
      */
-    private Long lookupFileId(Long userId, String url) {
-        if (StrUtil.isBlank(url)) {
+    private Long resolveFileId(Long fileId, Long userId) {
+        if (fileId == null) {
             return null;
         }
         UserFileEntity file = userFileMapper.selectOneByQuery(
-                QueryWrapper.create().eq(UserFileEntity::getUserId, userId)
-                        .eq(UserFileEntity::getUrl, url));
+                QueryWrapper.create().eq(UserFileEntity::getId, fileId)
+                        .eq(UserFileEntity::getUserId, userId));
         return file != null ? file.getId() : null;
     }
 

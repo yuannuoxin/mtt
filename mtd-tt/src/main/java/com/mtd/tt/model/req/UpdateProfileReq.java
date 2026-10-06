@@ -18,8 +18,14 @@ public class UpdateProfileReq extends BaseRequest {
     @Parameter(description = "头像地址")
     private String avatar;
 
+    @Parameter(description = "头像压缩图地址")
+    private String avatarThumb;
+
     @Parameter(description = "横幅大图")
     private String banner;
+
+    @Parameter(description = "横幅压缩图地址")
+    private String bannerThumb;
 
     @Parameter(description = "个人简介")
     private String bio;
