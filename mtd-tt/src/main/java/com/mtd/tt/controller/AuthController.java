@@ -2,6 +2,7 @@ package com.mtd.tt.controller;
 
 import com.mtd.common.core.result.Result;
 import com.mtd.tt.model.req.EmailCodeLoginReq;
+import com.mtd.tt.model.req.ForgotPasswordReq;
 import com.mtd.tt.model.req.PasswordLoginReq;
 import com.mtd.tt.model.req.RegisterReq;
 import com.mtd.tt.model.req.SendEmailCodeReq;
@@ -60,6 +61,13 @@ public class AuthController {
     @PostMapping("/emailCodeLogin")
     public Result<LoginResp> emailCodeLogin(@RequestBody EmailCodeLoginReq req) {
         return Result.success(authService.emailCodeLogin(req));
+    }
+
+    @Operation(summary = "忘记密码（邮箱验证码重置密码）")
+    @PostMapping("/forgotPassword")
+    public Result<Void> forgotPassword(@RequestBody ForgotPasswordReq req) {
+        authService.forgotPassword(req);
+        return Result.success();
     }
 
     @Operation(summary = "退出登录")

@@ -3,6 +3,7 @@ package com.mtd.tt.service;
 import cn.hutool.core.collection.CollUtil;
 import cn.hutool.core.util.ObjectUtil;
 import cn.hutool.core.util.StrUtil;
+import cn.hutool.crypto.digest.BCrypt;
 import com.mtd.common.core.exception.BusinessException;
 import com.mtd.common.core.request.PageRequest;
 import com.mtd.common.core.response.PageResponse;
@@ -17,10 +18,12 @@ import com.mtd.tt.model.entity.UserEntity;
 import com.mtd.tt.model.req.UpdateProfileReq;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.UserStatusEnum;
+import com.mtd.tt.util.FieldValidator;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
@@ -48,6 +51,12 @@ public class UserService {
     @Autowired
     private TurnstileService turnstileService;
 
+    /** 邮箱验证码 Redis key 前缀（与 AuthService 共用同一套验证码） */
+    private static final String EMAIL_CODE_PREFIX = "tt:login:email:code:";
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
     /**
      * 获取用户资料（含关系与统计）
      *
@@ -67,7 +76,32 @@ public class UserService {
         turnstileService.verify(req.getTurnstileToken());
         UserEntity user = getActiveUser(currentUserId);
         if (StrUtil.isNotBlank(req.getNickname())) {
+            FieldValidator.validateNickname(req.getNickname());
             user.setNickname(req.getNickname());
+        }
+        // 修改邮箱：格式 + 验证码 + 唯一性
+        if (StrUtil.isNotBlank(req.getEmail())) {
+            FieldValidator.validateEmail(req.getEmail());
+            if (!req.getEmail().equals(user.getEmail())) {
+                verifyEmailCode(req.getEmail(), req.getEmailCode());
+                UserEntity byEmail = userMapper.selectOneByQuery(
+                        QueryWrapper.create().eq(UserEntity::getEmail, req.getEmail()));
+                if (byEmail != null && !byEmail.getId().equals(currentUserId)) {
+                    throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该邮箱已被其他账号使用");
+                }
+                user.setEmail(req.getEmail());
+            }
+        }
+        // 修改密码：需当前密码 + 新密码长度校验
+        if (StrUtil.isNotBlank(req.getNewPassword())) {
+            FieldValidator.validatePassword(req.getNewPassword());
+            if (StrUtil.isBlank(req.getOldPassword())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请填写当前密码");
+            }
+            if (!BCrypt.checkpw(req.getOldPassword(), user.getPasswordHash())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前密码不正确");
+            }
+            user.setPasswordHash(BCrypt.hashpw(req.getNewPassword(), BCrypt.gensalt()));
         }
         if (req.getAvatar() != null) {
             user.setAvatar(req.getAvatar());
@@ -83,6 +117,21 @@ public class UserService {
         }
         userMapper.update(user);
         return buildProfile(user, currentUserId, true);
+    }
+
+    /**
+     * 校验邮箱验证码（与注册/邮箱登录共用同一套 Redis 验证码），校验通过即删除。
+     */
+    private void verifyEmailCode(String email, String emailCode) {
+        if (StrUtil.isBlank(emailCode)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请输入邮箱验证码");
+        }
+        String key = EMAIL_CODE_PREFIX + email;
+        String cached = redisTemplate.opsForValue().get(key);
+        if (cached == null || !cached.equals(emailCode)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "邮箱验证码错误或已过期");
+        }
+        redisTemplate.delete(key);
     }
 
     /**
@@ -264,10 +313,12 @@ public class UserService {
      */
     public UserProfileResp buildProfile(UserEntity user, Long currentUserId, boolean needCounts) {
         UserProfileResp resp = new UserProfileResp();
+        boolean self = currentUserId != null && currentUserId.equals(user.getId());
         resp.setId(user.getId());
         resp.setUsername(user.getUsername());
         resp.setNickname(user.getNickname());
-        resp.setEmail(user.getEmail());
+        // 邮箱仅本人可见：只有查看自己的资料时才返回 email，其他用户看不到
+        resp.setEmail(self ? user.getEmail() : null);
         resp.setAvatar(user.getAvatar());
         resp.setBanner(user.getBanner());
         resp.setBio(user.getBio());
@@ -275,7 +326,6 @@ public class UserService {
         resp.setUserPrivate(user.getUserPrivate());
         resp.setCreatedAt(user.getCreatedAt());
 
-        boolean self = currentUserId != null && currentUserId.equals(user.getId());
         resp.setIsFollowed(!self && isFollowing(currentUserId, user.getId()));
         resp.setIsBlocked(!self && isBlocked(currentUserId, user.getId()));
 

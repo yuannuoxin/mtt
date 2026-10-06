@@ -10,12 +10,14 @@ import com.mtd.common.core.result.ResultCode;
 import com.mtd.tt.mapper.UserMapper;
 import com.mtd.tt.model.entity.UserEntity;
 import com.mtd.tt.model.req.EmailCodeLoginReq;
+import com.mtd.tt.model.req.ForgotPasswordReq;
 import com.mtd.tt.model.req.PasswordLoginReq;
 import com.mtd.tt.model.req.RegisterReq;
 import com.mtd.tt.model.req.SendEmailCodeReq;
 import com.mtd.tt.model.resp.LoginResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.UserStatusEnum;
+import com.mtd.tt.util.FieldValidator;
 import com.mtd.tt.util.LoginUtil;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -77,6 +79,11 @@ public class AuthService {
                 || StrUtil.isBlank(req.getEmail()) || StrUtil.isBlank(req.getPassword())) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "用户名、昵称、邮箱、密码均不能为空");
         }
+        // 字段格式/长度校验（与编辑、忘记密码共用一套规则）
+        FieldValidator.validateUsername(req.getUsername());
+        FieldValidator.validateNickname(req.getNickname());
+        FieldValidator.validateEmail(req.getEmail());
+        FieldValidator.validatePassword(req.getPassword());
         // 邮箱验证码注册：启用时校验验证码；开发期关闭则跳过（便利）
         if (emailService.isEnabled()) {
             if (StrUtil.isBlank(req.getEmailCode())) {
@@ -118,9 +125,7 @@ public class AuthService {
      */
     public void sendEmailCode(SendEmailCodeReq req) {
         turnstileService.verify(req.getTurnstileToken());
-        if (StrUtil.isBlank(req.getEmail())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "邮箱不能为空");
-        }
+        FieldValidator.validateEmail(req.getEmail());
         // 60 秒冷却，防止刷验证码
         Boolean ok = redisTemplate.opsForValue()
                 .setIfAbsent(EMAIL_CODE_FREQ_PREFIX + req.getEmail(), "1", FREQ_LIMIT_SECONDS, TimeUnit.SECONDS);
@@ -154,6 +159,32 @@ public class AuthService {
                 QueryWrapper.create().eq(UserEntity::getEmail, req.getEmail()));
         checkCanLogin(user);
         return doLogin(user);
+    }
+
+    /**
+     * 忘记密码：通过邮箱验证码重置密码
+     */
+    public void forgotPassword(ForgotPasswordReq req) {
+        turnstileService.verify(req.getTurnstileToken());
+        FieldValidator.validateEmail(req.getEmail());
+        FieldValidator.validatePassword(req.getNewPassword());
+        if (StrUtil.isBlank(req.getEmailCode())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请输入邮箱验证码");
+        }
+        String cacheKey = EMAIL_CODE_PREFIX + req.getEmail();
+        String cachedCode = redisTemplate.opsForValue().get(cacheKey);
+        if (cachedCode == null || !cachedCode.equals(req.getEmailCode())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "邮箱验证码错误或已过期");
+        }
+        redisTemplate.delete(cacheKey);
+        UserEntity user = userMapper.selectOneByQuery(
+                QueryWrapper.create().eq(UserEntity::getEmail, req.getEmail()));
+        if (user == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该邮箱未注册");
+        }
+        checkCanLogin(user);
+        user.setPasswordHash(BCrypt.hashpw(req.getNewPassword(), BCrypt.gensalt()));
+        userMapper.update(user);
     }
 
     /**
