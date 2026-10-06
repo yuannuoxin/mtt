@@ -25,6 +25,9 @@ public final class FieldValidator {
     public static final int PASSWORD_MIN = 6;
     public static final int PASSWORD_MAX = 32;
 
+    /** 邮箱：标准格式且长度不超过 64 位 */
+    public static final int EMAIL_MAX = 64;
+
     /** 邮箱标准格式 */
     private static final Pattern EMAIL_PATTERN =
             Pattern.compile("^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
@@ -58,6 +61,9 @@ public final class FieldValidator {
         }
         if (!EMAIL_PATTERN.matcher(email).matches()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "邮箱格式不正确");
+        }
+        if (email.length() > EMAIL_MAX) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "邮箱长度不能超过 " + EMAIL_MAX + " 位");
         }
     }
 

@@ -3,6 +3,8 @@ package com.mtd.tt.controller;
 import com.mtd.common.core.response.PageResponse;
 import com.mtd.common.core.result.Result;
 import com.mtd.tt.model.req.BlockReq;
+import com.mtd.tt.model.req.ChangeEmailReq;
+import com.mtd.tt.model.req.ChangePasswordReq;
 import com.mtd.tt.model.req.FollowReq;
 import com.mtd.tt.model.req.SearchUserReq;
 import com.mtd.tt.model.req.UpdateProfileReq;
@@ -42,6 +44,20 @@ public class UserController {
     public Result<UserProfileResp> updateProfile(@RequestBody UpdateProfileReq req) {
         Long currentUserId = LoginUtil.currentUserId();
         return Result.success(userService.updateProfile(currentUserId, req));
+    }
+
+    @Operation(summary = "单独修改密码")
+    @PostMapping("/changePassword")
+    public Result<Void> changePassword(@RequestBody ChangePasswordReq req) {
+        userService.changePassword(LoginUtil.currentUserId(), req);
+        return Result.success();
+    }
+
+    @Operation(summary = "单独修改邮箱")
+    @PostMapping("/changeEmail")
+    public Result<UserProfileResp> changeEmail(@RequestBody ChangeEmailReq req) {
+        Long currentUserId = LoginUtil.currentUserId();
+        return Result.success(userService.changeEmail(currentUserId, req));
     }
 
     @Operation(summary = "关注用户")

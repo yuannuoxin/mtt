@@ -15,6 +15,8 @@ import com.mtd.tt.mapper.UserMapper;
 import com.mtd.tt.model.entity.BlockEntity;
 import com.mtd.tt.model.entity.FollowEntity;
 import com.mtd.tt.model.entity.UserEntity;
+import com.mtd.tt.model.req.ChangeEmailReq;
+import com.mtd.tt.model.req.ChangePasswordReq;
 import com.mtd.tt.model.req.UpdateProfileReq;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.UserStatusEnum;
@@ -79,30 +81,6 @@ public class UserService {
             FieldValidator.validateNickname(req.getNickname());
             user.setNickname(req.getNickname());
         }
-        // 修改邮箱：格式 + 验证码 + 唯一性
-        if (StrUtil.isNotBlank(req.getEmail())) {
-            FieldValidator.validateEmail(req.getEmail());
-            if (!req.getEmail().equals(user.getEmail())) {
-                verifyEmailCode(req.getEmail(), req.getEmailCode());
-                UserEntity byEmail = userMapper.selectOneByQuery(
-                        QueryWrapper.create().eq(UserEntity::getEmail, req.getEmail()));
-                if (byEmail != null && !byEmail.getId().equals(currentUserId)) {
-                    throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该邮箱已被其他账号使用");
-                }
-                user.setEmail(req.getEmail());
-            }
-        }
-        // 修改密码：需当前密码 + 新密码长度校验
-        if (StrUtil.isNotBlank(req.getNewPassword())) {
-            FieldValidator.validatePassword(req.getNewPassword());
-            if (StrUtil.isBlank(req.getOldPassword())) {
-                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请填写当前密码");
-            }
-            if (!BCrypt.checkpw(req.getOldPassword(), user.getPasswordHash())) {
-                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前密码不正确");
-            }
-            user.setPasswordHash(BCrypt.hashpw(req.getNewPassword(), BCrypt.gensalt()));
-        }
         if (req.getAvatar() != null) {
             user.setAvatar(req.getAvatar());
         }
@@ -115,6 +93,46 @@ public class UserService {
         if (req.getUserPrivate() != null) {
             user.setUserPrivate(req.getUserPrivate());
         }
+        userMapper.update(user);
+        return buildProfile(user, currentUserId, true);
+    }
+
+    /**
+     * 单独修改密码：需当前密码校验 + 新密码长度校验
+     */
+    public void changePassword(Long currentUserId, ChangePasswordReq req) {
+        requireLogin(currentUserId);
+        turnstileService.verify(req.getTurnstileToken());
+        FieldValidator.validatePassword(req.getNewPassword());
+        if (StrUtil.isBlank(req.getOldPassword())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请填写当前密码");
+        }
+        UserEntity user = getActiveUser(currentUserId);
+        if (!BCrypt.checkpw(req.getOldPassword(), user.getPasswordHash())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前密码不正确");
+        }
+        user.setPasswordHash(BCrypt.hashpw(req.getNewPassword(), BCrypt.gensalt()));
+        userMapper.update(user);
+    }
+
+    /**
+     * 单独修改邮箱：格式 + 验证码 + 唯一性
+     */
+    public UserProfileResp changeEmail(Long currentUserId, ChangeEmailReq req) {
+        requireLogin(currentUserId);
+        turnstileService.verify(req.getTurnstileToken());
+        FieldValidator.validateEmail(req.getEmail());
+        UserEntity user = getActiveUser(currentUserId);
+        if (req.getEmail().equals(user.getEmail())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "新邮箱与当前邮箱相同");
+        }
+        verifyEmailCode(req.getEmail(), req.getEmailCode());
+        UserEntity byEmail = userMapper.selectOneByQuery(
+                QueryWrapper.create().eq(UserEntity::getEmail, req.getEmail()));
+        if (byEmail != null && !byEmail.getId().equals(currentUserId)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该邮箱已被其他账号使用");
+        }
+        user.setEmail(req.getEmail());
         userMapper.update(user);
         return buildProfile(user, currentUserId, true);
     }
