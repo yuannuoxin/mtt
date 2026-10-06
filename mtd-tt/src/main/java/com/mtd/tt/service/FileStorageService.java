@@ -125,6 +125,13 @@ public class FileStorageService {
     }
 
     private String buildUrl(String objectKey) {
+        return buildAccessUrl(objectKey);
+    }
+
+    /**
+     * 由对象 key 生成可访问 URL（供文件记录等使用）。
+     */
+    public String buildAccessUrl(String objectKey) {
         return endpoint.replaceAll("/+$", "") + "/" + bucket + "/" + objectKey;
     }
 }

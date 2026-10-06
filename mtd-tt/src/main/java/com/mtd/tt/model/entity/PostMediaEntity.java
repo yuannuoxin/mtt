@@ -15,6 +15,12 @@ import java.time.OffsetDateTime;
 public class PostMediaEntity extends BaseEntity {
     private Long postId;
     private String mediaType;
+    /** 指向 user_files.id：原图/封面 */
+    private Long originalFileId;
+    /** 指向 user_files.id：缩略图 */
+    private Long thumbnailFileId;
+    /** 指向 user_files.id：视频/音频文件 */
+    private Long playFileId;
     private String originalUrl;
     private String thumbnailUrl;
     private String playUrl;

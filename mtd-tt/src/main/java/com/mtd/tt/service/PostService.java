@@ -13,6 +13,7 @@ import com.mtd.tt.mapper.PostLinkCardMapper;
 import com.mtd.tt.mapper.PostMapper;
 import com.mtd.tt.mapper.PostMediaMapper;
 import com.mtd.tt.mapper.PostMentionMapper;
+import com.mtd.tt.mapper.UserFileMapper;
 import com.mtd.tt.mapper.UserMapper;
 import com.mtd.tt.mapper.UserTimelineMapper;
 import com.mtd.tt.model.entity.BookmarkEntity;
@@ -22,6 +23,7 @@ import com.mtd.tt.model.entity.PostLinkCardEntity;
 import com.mtd.tt.model.entity.PostMediaEntity;
 import com.mtd.tt.model.entity.PostMentionEntity;
 import com.mtd.tt.model.entity.UserEntity;
+import com.mtd.tt.model.entity.UserFileEntity;
 import com.mtd.tt.model.entity.UserTimelineEntity;
 import com.mtd.tt.model.req.CreatePostLinkCardReq;
 import com.mtd.tt.model.req.CreatePostMediaReq;
@@ -78,6 +80,8 @@ public class PostService {
     private PostMentionMapper postMentionMapper;
     @Autowired
     private PostLinkCardMapper postLinkCardMapper;
+    @Autowired
+    private UserFileMapper userFileMapper;
     @Autowired
     private LinkCardService linkCardService;
     @Autowired
@@ -203,7 +207,18 @@ public class PostService {
                 media.setWidth(item.getWidth());
                 media.setHeight(item.getHeight());
                 media.setDuration(item.getDuration());
+                // 按 url 关联 user_files，并校验文件归属当前用户
+                Long originalFileId = lookupFileId(currentUserId, item.getOriginalUrl());
+                Long thumbnailFileId = lookupFileId(currentUserId, item.getThumbnailUrl());
+                Long playFileId = lookupFileId(currentUserId, item.getPlayUrl());
+                media.setOriginalFileId(originalFileId);
+                media.setThumbnailFileId(thumbnailFileId);
+                media.setPlayFileId(playFileId);
                 postMediaMapper.insertSelective(media);
+                // 回填文件归属推文
+                bindFileToPost(originalFileId, currentUserId, postId);
+                bindFileToPost(thumbnailFileId, currentUserId, postId);
+                bindFileToPost(playFileId, currentUserId, postId);
             }
         }
 
@@ -278,6 +293,33 @@ public class PostService {
         timelineService.pushOnPostCreated(post);
 
         return buildPostResp(post, currentUserId);
+    }
+
+    /**
+     * 按 url + 当前用户 查找文件记录 id（校验归属：只认当前用户自己上传的文件）。
+     */
+    private Long lookupFileId(Long userId, String url) {
+        if (StrUtil.isBlank(url)) {
+            return null;
+        }
+        UserFileEntity file = userFileMapper.selectOneByQuery(
+                QueryWrapper.create().eq(UserFileEntity::getUserId, userId)
+                        .eq(UserFileEntity::getUrl, url));
+        return file != null ? file.getId() : null;
+    }
+
+    /**
+     * 文件回填归属推文（带用户校验，只更新当前用户自己的文件）。
+     */
+    private void bindFileToPost(Long fileId, Long userId, Long postId) {
+        if (fileId == null) {
+            return;
+        }
+        UserFileEntity upd = new UserFileEntity();
+        upd.setPostId(postId);
+        userFileMapper.updateByQuery(upd,
+                QueryWrapper.create().eq(UserFileEntity::getId, fileId)
+                        .eq(UserFileEntity::getUserId, userId));
     }
 
     /**

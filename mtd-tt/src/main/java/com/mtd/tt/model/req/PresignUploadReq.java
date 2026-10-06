@@ -17,4 +17,10 @@ public class PresignUploadReq extends BaseRequest {
 
     @Parameter(description = "文件 Content-Type，如 image/png")
     private String contentType;
+
+    @Parameter(description = "上传场景 FileSceneEnum：avatar/banner/post，默认 post")
+    private String scene;
+
+    @Parameter(description = "是否缩略图（路径体现 _thumb）")
+    private Boolean thumbnail;
 }
