@@ -102,6 +102,8 @@ public class PostService {
     private UserTimelineMapper userTimelineMapper;
     @Autowired
     private TimelineService timelineService;
+    @Autowired
+    private PointService pointService;
 
     /**
      * 创建帖子（original / reply / quote / repost）
@@ -156,6 +158,8 @@ public class PostService {
         // 基础热度 = 帖子类型权重（原帖>引用>回复>转发），互动在此基础上累加；
         // 排序时再叠加时间衰减，避免回复/转发这类低价值内容占据太多展示位
         post.setHotScore(PostTypeWeightEnum.of(type).getBase());
+        // 发帖/转发/引用 扣 postCost，回复 扣 replyCost；积分不足则拒绝（在插入前拦截）
+        pointService.deductForPost(currentUserId, type);
         postMapper.insertSelective(post);
         Long postId = post.getId();
 

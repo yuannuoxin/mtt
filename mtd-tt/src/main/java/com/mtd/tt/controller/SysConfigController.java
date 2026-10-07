@@ -40,7 +40,9 @@ public class SysConfigController {
             "recaptcha.v2_invisible.site_key", "recaptcha.v2_invisible.secret_key",
             "email_code.enabled",
             "email.smtp.host", "email.smtp.port", "email.smtp.username",
-            "email.smtp.password", "email.smtp.from");
+            "email.smtp.password", "email.smtp.from",
+            "points.checkin", "points.post", "points.reply",
+            "points.upload_per_mb", "points.initial");
 
     @Operation(summary = "更新控制配置")
     @PostMapping("/set")

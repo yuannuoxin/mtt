@@ -63,4 +63,7 @@ public class UserProfileResp implements Serializable {
 
     @Parameter(description = "发帖数")
     private Long postCount;
+
+    @Parameter(description = "积分余额")
+    private Long points;
 }

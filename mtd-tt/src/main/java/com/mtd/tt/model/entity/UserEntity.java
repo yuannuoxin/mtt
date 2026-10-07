@@ -47,4 +47,8 @@ public class UserEntity extends BaseEntity {
      *  user_private: 是否私密账号
      */
     private Boolean userPrivate;
+    /**
+     * 积分余额
+     */
+    private Long points;
 }

@@ -56,7 +56,12 @@ public class SysConfigService {
                    ('email.smtp.port', '465', 'SMTP 端口'),
                    ('email.smtp.username', '', 'SMTP 账号'),
                    ('email.smtp.password', '', 'SMTP 密码'),
-                   ('email.smtp.from', '', '发件人邮箱')
+                   ('email.smtp.from', '', '发件人邮箱'),
+                   ('points.checkin', '1', '每日签到送积分'),
+                   ('points.post', '10', '发帖/转发/引用 扣积分'),
+                   ('points.reply', '2', '回复扣积分'),
+                   ('points.upload_per_mb', '1', '上传每1MB扣积分（不足1MB按1MB）'),
+                   ('points.initial', '100', '新用户注册初始积分')
             ON CONFLICT (cfg_key) DO NOTHING
             """;
 
@@ -125,6 +130,22 @@ public class SysConfigService {
             return def;
         }
         return "true".equalsIgnoreCase(v) || "1".equals(v);
+    }
+
+    /**
+     * 读取整数配置，默认值兜底
+     */
+    public int getInt(String key, int def) {
+        refreshIfStale();
+        String v = cache.get(key);
+        if (v == null) {
+            return def;
+        }
+        try {
+            return (int) Long.parseLong(v.trim());
+        } catch (NumberFormatException e) {
+            return def;
+        }
     }
 
     /**

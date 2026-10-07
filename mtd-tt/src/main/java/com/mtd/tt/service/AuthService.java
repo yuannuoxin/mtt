@@ -49,6 +49,9 @@ public class AuthService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private PointService pointService;
+
     private static final String EMAIL_CODE_PREFIX = "tt:login:email:code:";
     private static final String EMAIL_CODE_FREQ_PREFIX = "tt:login:email:freq:";
     private static final long CODE_EXPIRE_MINUTES = 5;
@@ -115,7 +118,10 @@ public class AuthService {
         user.setEmail(req.getEmail());
         user.setPasswordHash(BCrypt.hashpw(req.getPassword(), BCrypt.gensalt()));
         user.setStatus(UserStatusEnum.ACTIVE.getCode());
+        // 注册赠送初始积分
+        user.setPoints((long) pointService.initialPoint());
         userMapper.insertSelective(user);
+        pointService.grantRegisterPoints(user.getId());
 
         return doLogin(user);
     }

@@ -12,6 +12,7 @@ import com.mtd.tt.model.entity.UserFileEntity;
 import com.mtd.tt.model.req.PresignUploadReq;
 import com.mtd.tt.model.resp.FileUploadResp;
 import com.mtd.tt.service.FileStorageService;
+import com.mtd.tt.service.PointService;
 import com.mtd.tt.util.LoginUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +40,7 @@ public class FileController {
 
     private final FileStorageService fileStorageService;
     private final UserFileMapper userFileMapper;
+    private final PointService pointService;
 
     @Operation(summary = "上传文件（multipart/form-data，字段名 file；scene=avatar/banner/post，thumbnail=true 表示缩略图）")
     @PostMapping("/upload")
@@ -52,6 +54,8 @@ public class FileController {
         }
         Long userId = requireLogin();
         FileSceneEnum sceneEnum = resolveScene(scene);
+        // 上传扣积分（按文件大小，不足1MB按1MB）；积分不足拒绝
+        pointService.deductForUpload(userId, file.getSize());
         String objectKey = buildObjectKey(userId, sceneEnum, file.getOriginalFilename(), thumbnail);
         try {
             String url = fileStorageService.upload(objectKey, file.getInputStream(), file.getSize(), file.getContentType());
@@ -71,6 +75,9 @@ public class FileController {
         Long userId = requireLogin();
         FileSceneEnum sceneEnum = resolveScene(req.getScene());
         boolean thumbnail = Boolean.TRUE.equals(req.getThumbnail());
+        // 上传扣积分（按前端上报的文件大小，不足1MB按1MB）；积分不足拒绝
+        long size = req.getSize() == null ? 0L : req.getSize();
+        pointService.deductForUpload(userId, size);
         String objectKey = buildObjectKey(userId, sceneEnum, req.getFileName(), thumbnail);
         String presignUrl = fileStorageService.presignUploadUrl(objectKey, req.getContentType());
         // 预建文件记录：url 存可访问地址（供发推时按 url 关联），前端 PUT 成功后即实际生效
