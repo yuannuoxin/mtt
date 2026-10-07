@@ -34,7 +34,10 @@ public class SysConfigController {
             "turnstile.managed.site_key", "turnstile.managed.secret_key",
             "turnstile.invisible.site_key", "turnstile.invisible.secret_key",
             "captcha.provider",
+            "recaptcha.mode",
             "recaptcha.site_key", "recaptcha.secret_key", "recaptcha.threshold",
+            "recaptcha.v2.site_key", "recaptcha.v2.secret_key",
+            "recaptcha.v2_invisible.site_key", "recaptcha.v2_invisible.secret_key",
             "email_code.enabled",
             "email.smtp.host", "email.smtp.port", "email.smtp.username",
             "email.smtp.password", "email.smtp.from");

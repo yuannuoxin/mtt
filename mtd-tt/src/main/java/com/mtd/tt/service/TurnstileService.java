@@ -18,7 +18,8 @@ import java.util.Map;
  * 人机校验服务，支持两种提供商（由 captcha.provider 控制，非法值回退 turnstile）：
  * <ul>
  *   <li>turnstile ：Cloudflare Turnstile（managed / invisible / non_interactive 三种模式）</li>
- *   <li>recaptcha ：Google reCAPTCHA v3（无交互，按 score 阈值放行）</li>
+ *   <li>recaptcha ：Google reCAPTCHA（v3 无感评分 / v2 复选框 / v2_invisible 隐形三种模式，
+ *       统一走 recaptcha.net 域名，便于大陆访问）</li>
  * </ul>
  * 是否启用由 sys_config 的 turnstile.enabled 统一控制：开发期默认关闭则校验直接放行，
  * 关闭/开启实时生效，无需重启。
@@ -28,7 +29,7 @@ import java.util.Map;
 public class TurnstileService {
 
     private static final String TURNSTILE_SITEVERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
-    private static final String RECAPTCHA_SITEVERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
+    private static final String RECAPTCHA_SITEVERIFY_URL = "https://www.recaptcha.net/recaptcha/api/siteverify";
     private static final int HTTP_TIMEOUT_MS = 8000;
 
     @Autowired
@@ -53,10 +54,27 @@ public class TurnstileService {
         };
     }
 
+    /** 当前 reCAPTCHA 模式：v3 / v2 / v2_invisible（非法值回退 v3） */
+    public String recaptchaMode() {
+        String m = StrUtil.nullToEmpty(configService.get("recaptcha.mode"));
+        return switch (m) {
+            case "v2", "v2_invisible" -> m;
+            default -> "v3";
+        };
+    }
+
+    private String firstNonBlank(String a, String b) {
+        return StrUtil.isNotBlank(a) ? a : StrUtil.nullToEmpty(b);
+    }
+
     /** 按提供商取 Site Key（前端渲染用） */
     public String siteKey() {
         if ("recaptcha".equals(provider())) {
-            return StrUtil.nullToEmpty(configService.get("recaptcha.site_key"));
+            return switch (recaptchaMode()) {
+                case "v2" -> firstNonBlank(configService.get("recaptcha.v2.site_key"), configService.get("recaptcha.site_key"));
+                case "v2_invisible" -> firstNonBlank(configService.get("recaptcha.v2_invisible.site_key"), configService.get("recaptcha.site_key"));
+                default -> StrUtil.nullToEmpty(configService.get("recaptcha.site_key"));
+            };
         }
         String key = switch (mode()) {
             case "managed" -> configService.get("turnstile.managed.site_key");
@@ -72,7 +90,11 @@ public class TurnstileService {
     /** 按提供商取 Secret Key（后端 siteverify 用） */
     public String secretKey() {
         if ("recaptcha".equals(provider())) {
-            return StrUtil.nullToEmpty(configService.get("recaptcha.secret_key"));
+            return switch (recaptchaMode()) {
+                case "v2" -> firstNonBlank(configService.get("recaptcha.v2.secret_key"), configService.get("recaptcha.secret_key"));
+                case "v2_invisible" -> firstNonBlank(configService.get("recaptcha.v2_invisible.secret_key"), configService.get("recaptcha.secret_key"));
+                default -> StrUtil.nullToEmpty(configService.get("recaptcha.secret_key"));
+            };
         }
         String key = switch (mode()) {
             case "managed" -> configService.get("turnstile.managed.secret_key");
@@ -87,7 +109,7 @@ public class TurnstileService {
 
     /**
      * 校验人机 token；未启用时直接放行（开发便利）。
-     * 按当前 provider 分流到 Turnstile / reCAPTCHA v3。
+     * 按当前 provider 分流到 Turnstile / reCAPTCHA。
      */
     public void verify(String token) {
         if (!isEnabled()) {
@@ -139,11 +161,14 @@ public class TurnstileService {
                 log.warn("reCAPTCHA 校验失败: {}", resp);
                 throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "人机校验未通过，请刷新后重试");
             }
-            double score = json.getDouble("score", 0.0);
-            double threshold = parseThreshold();
-            if (score < threshold) {
-                log.warn("reCAPTCHA score={} 低于阈值 {}，拒绝", score, threshold);
-                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "人机校验未通过，请刷新后重试");
+            // v3 才校验 score 阈值；v2 / v2_invisible 无分数，只需 success
+            if ("v3".equals(recaptchaMode())) {
+                double score = json.getDouble("score", 0.0);
+                double threshold = parseThreshold();
+                if (score < threshold) {
+                    log.warn("reCAPTCHA v3 score={} 低于阈值 {}，拒绝", score, threshold);
+                    throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "人机校验未通过，请刷新后重试");
+                }
             }
         } catch (BusinessException e) {
             throw e;
@@ -174,6 +199,7 @@ public class TurnstileService {
         cfg.put("enabled", isEnabled());
         cfg.put("provider", provider());
         cfg.put("mode", mode());
+        cfg.put("recaptchaMode", recaptchaMode());
         cfg.put("siteKey", siteKey());
         cfg.put("emailCodeEnabled", configService.getBool("email_code.enabled", false));
         return cfg;
