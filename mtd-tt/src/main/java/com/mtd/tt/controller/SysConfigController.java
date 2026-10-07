@@ -3,8 +3,12 @@ package com.mtd.tt.controller;
 import com.mtd.common.core.exception.BusinessException;
 import com.mtd.common.core.result.Result;
 import com.mtd.common.core.result.ResultCode;
+import com.mtd.tt.mapper.UserMapper;
+import com.mtd.tt.model.entity.UserEntity;
 import com.mtd.tt.model.req.SetConfigReq;
 import com.mtd.tt.service.SysConfigService;
+import com.mtd.tt.util.LoginUtil;
+import com.mybatisflex.core.query.QueryWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +30,7 @@ import java.util.Set;
 public class SysConfigController {
 
     private final SysConfigService sysConfigService;
+    private final UserMapper userMapper;
 
     /** 允许通过接口修改的配置键白名单（不含任何越权键） */
     private static final Set<String> ALLOWED_KEYS = Set.of(
@@ -45,9 +50,10 @@ public class SysConfigController {
             "points.checkin", "points.post", "points.reply",
             "points.upload_per_mb", "points.initial");
 
-    @Operation(summary = "更新控制配置")
+    @Operation(summary = "更新控制配置（仅管理员）")
     @PostMapping("/set")
     public Result<Map<String, String>> set(@RequestBody SetConfigReq req) {
+        requireAdmin();
         if (req.getKey() == null || req.getKey().isBlank()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "配置键不能为空");
         }
@@ -56,5 +62,18 @@ public class SysConfigController {
         }
         sysConfigService.set(req.getKey(), req.getValue());
         return Result.success(Map.of("key", req.getKey(), "value", req.getValue() == null ? "" : req.getValue()));
+    }
+
+    /** 仅允许管理员调用：当前登录用户 is_admin 为 true 才放行，否则拒绝 */
+    private void requireAdmin() {
+        Long userId = LoginUtil.currentUserId();
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "请先登录");
+        }
+        UserEntity user = userMapper.selectOneByQuery(
+                QueryWrapper.create().eq(UserEntity::getId, userId));
+        if (user == null || !Boolean.TRUE.equals(user.getIsAdmin())) {
+            throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权限，仅管理员可修改系统配置");
+        }
     }
 }

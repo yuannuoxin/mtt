@@ -351,6 +351,7 @@ public class UserService {
         resp.setStatus(user.getStatus());
         resp.setUserPrivate(user.getUserPrivate());
         resp.setPoints(user.getPoints());
+        resp.setIsAdmin(user.getIsAdmin());
         resp.setCreatedAt(user.getCreatedAt());
 
         resp.setIsFollowed(!self && isFollowing(currentUserId, user.getId()));

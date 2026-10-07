@@ -66,4 +66,7 @@ public class UserProfileResp implements Serializable {
 
     @Parameter(description = "积分余额")
     private Long points;
+
+    @Parameter(description = "是否管理员")
+    private Boolean isAdmin;
 }

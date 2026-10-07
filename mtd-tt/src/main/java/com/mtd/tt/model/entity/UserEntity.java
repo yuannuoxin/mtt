@@ -51,4 +51,9 @@ public class UserEntity extends BaseEntity {
      * 积分余额
      */
     private Long points;
+
+    /**
+     *  is_admin: 是否管理员（默认 false，仅管理员可修改系统配置）
+     */
+    private Boolean isAdmin;
 }

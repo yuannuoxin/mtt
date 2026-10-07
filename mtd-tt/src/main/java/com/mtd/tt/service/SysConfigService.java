@@ -83,6 +83,8 @@ public class SysConfigService {
         try {
             jdbcTemplate.execute(CREATE_TABLE_SQL);
             jdbcTemplate.execute(INIT_SQL);
+            // 用户表管理员标记（新用户默认非管理员；授权由后台 UPDATE users SET is_admin=true 完成）
+            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE");
             reloadCache();
             log.info("sys_config 初始化完成，配置项 {} 条", cache.size());
         } catch (Exception e) {
