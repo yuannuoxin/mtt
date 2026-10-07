@@ -62,7 +62,12 @@ public class SysConfigService {
                    ('points.post', '10', '发帖/转发/引用 扣积分'),
                    ('points.reply', '2', '回复扣积分'),
                    ('points.upload_per_mb', '1', '上传每1MB扣积分（不足1MB按1MB）'),
-                   ('points.initial', '100', '新用户注册初始积分')
+                   ('points.initial', '100', '新用户注册初始积分'),
+                   ('exp.per.post', '5', '发帖获得经验'),
+                   ('exp.per.quote', '3', '引用获得经验'),
+                   ('exp.per.repost', '2', '转发获得经验'),
+                   ('exp.per.reply', '1', '回复获得经验'),
+                   ('exp.level.thresholds', '100,300,600,1000', '经验等级挡位（逗号分隔：升到2/3/4/5级所需累计经验）')
             ON CONFLICT (cfg_key) DO NOTHING
             """;
 
@@ -86,6 +91,9 @@ public class SysConfigService {
             // 用户表管理员标记（新用户默认非管理员；授权由后台 UPDATE users SET admin=true 完成）
             // 不使用 is_ 开头字段：admin 列；若存在旧 is_admin 列则迁移后删除
             jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE");
+            // 经验与积分等级（users.exp / users.level，无 is 前缀字段）
+            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS exp BIGINT NOT NULL DEFAULT 0");
+            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS level INT NOT NULL DEFAULT 1");
             try {
                 jdbcTemplate.update("UPDATE users SET admin = COALESCE(is_admin, FALSE)");
                 jdbcTemplate.execute("ALTER TABLE users DROP COLUMN IF EXISTS is_admin");

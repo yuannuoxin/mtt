@@ -69,4 +69,10 @@ public class UserProfileResp implements Serializable {
 
     @Parameter(description = "是否管理员")
     private Boolean admin;
+
+    @Parameter(description = "经验值")
+    private Long exp;
+
+    @Parameter(description = "积分等级")
+    private Integer level;
 }

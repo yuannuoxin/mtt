@@ -48,7 +48,9 @@ public class SysConfigController {
             "email.smtp.password", "email.smtp.from",
             "email.domain.blacklist",
             "points.checkin", "points.post", "points.reply",
-            "points.upload_per_mb", "points.initial");
+            "points.upload_per_mb", "points.initial",
+            "exp.per.post", "exp.per.quote", "exp.per.repost", "exp.per.reply",
+            "exp.level.thresholds");
 
     @Operation(summary = "更新控制配置（仅管理员）")
     @PostMapping("/set")

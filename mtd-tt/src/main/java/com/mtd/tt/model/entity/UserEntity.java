@@ -56,4 +56,14 @@ public class UserEntity extends BaseEntity {
      *  is_admin: 是否管理员（默认 false，仅管理员可修改系统配置）
      */
     private Boolean admin;
+
+    /**
+     * 经验值
+     */
+    private Long exp;
+
+    /**
+     * 积分等级（由经验挡位决定，默认 1）
+     */
+    private Integer level;
 }

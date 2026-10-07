@@ -104,6 +104,8 @@ public class PostService {
     private TimelineService timelineService;
     @Autowired
     private PointService pointService;
+    @Autowired
+    private ExpService expService;
 
     /**
      * 创建帖子（original / reply / quote / repost）
@@ -160,6 +162,7 @@ public class PostService {
         post.setHotScore(PostTypeWeightEnum.of(type).getBase());
         // 发帖/转发/引用 扣 postCost，回复 扣 replyCost；积分不足则拒绝（在插入前拦截）
         pointService.deductForPost(currentUserId, type);
+        expService.gainExp(currentUserId, type);
         postMapper.insertSelective(post);
         Long postId = post.getId();
 
