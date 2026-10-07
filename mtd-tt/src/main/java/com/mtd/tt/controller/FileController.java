@@ -138,7 +138,7 @@ public class FileController {
         rec.setUrl(url);
         rec.setSize(size);
         rec.setContentType(contentType);
-        rec.setIsThumbnail(thumbnail);
+        rec.setThumbnail(thumbnail);
         rec.setCreatedAt(OffsetDateTime.now());
         userFileMapper.insertSelective(rec);
         return rec;

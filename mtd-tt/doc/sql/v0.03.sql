@@ -10,7 +10,7 @@ CREATE TABLE user_files (
     size         BIGINT,
     content_type VARCHAR(100),
     post_id      BIGINT,                            -- 归属推文，发推后回填
-    is_thumbnail BOOLEAN     NOT NULL DEFAULT FALSE,
+    thumbnail BOOLEAN  NOT NULL DEFAULT FALSE,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX idx_user_files_user ON user_files (user_id);

@@ -50,10 +50,10 @@ public class UserProfileResp implements Serializable {
 
     // ===== 关系与统计（列表/详情时由服务端计算） =====
     @Parameter(description = "当前登录用户是否已关注该用户")
-    private Boolean isFollowed;
+    private Boolean followed;
 
     @Parameter(description = "当前登录用户是否已拉黑该用户")
-    private Boolean isBlocked;
+    private Boolean blocked;
 
     @Parameter(description = "关注数")
     private Long followingCount;
@@ -68,5 +68,5 @@ public class UserProfileResp implements Serializable {
     private Long points;
 
     @Parameter(description = "是否管理员")
-    private Boolean isAdmin;
+    private Boolean admin;
 }

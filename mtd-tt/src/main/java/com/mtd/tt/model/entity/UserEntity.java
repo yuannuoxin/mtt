@@ -55,5 +55,5 @@ public class UserEntity extends BaseEntity {
     /**
      *  is_admin: 是否管理员（默认 false，仅管理员可修改系统配置）
      */
-    private Boolean isAdmin;
+    private Boolean admin;
 }

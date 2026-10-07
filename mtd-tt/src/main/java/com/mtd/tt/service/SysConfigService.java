@@ -83,8 +83,18 @@ public class SysConfigService {
         try {
             jdbcTemplate.execute(CREATE_TABLE_SQL);
             jdbcTemplate.execute(INIT_SQL);
-            // 用户表管理员标记（新用户默认非管理员；授权由后台 UPDATE users SET is_admin=true 完成）
-            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_admin BOOLEAN NOT NULL DEFAULT FALSE");
+            // 用户表管理员标记（新用户默认非管理员；授权由后台 UPDATE users SET admin=true 完成）
+            // 不使用 is_ 开头字段：admin 列；若存在旧 is_admin 列则迁移后删除
+            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS admin BOOLEAN NOT NULL DEFAULT FALSE");
+            try {
+                jdbcTemplate.update("UPDATE users SET admin = COALESCE(is_admin, FALSE)");
+                jdbcTemplate.execute("ALTER TABLE users DROP COLUMN IF EXISTS is_admin");
+            } catch (Exception ignored) {
+            }
+            try {
+                jdbcTemplate.execute("ALTER TABLE user_files RENAME COLUMN is_thumbnail TO thumbnail");
+            } catch (Exception ignored) {
+            }
             reloadCache();
             log.info("sys_config 初始化完成，配置项 {} 条", cache.size());
         } catch (Exception e) {

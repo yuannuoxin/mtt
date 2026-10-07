@@ -29,6 +29,6 @@ public class UserFileEntity extends BaseEntity {
     /** 归属推文 id，发推后回填 */
     private Long postId;
     /** 是否缩略图 */
-    private Boolean isThumbnail;
+    private Boolean thumbnail;
     private OffsetDateTime createdAt;
 }

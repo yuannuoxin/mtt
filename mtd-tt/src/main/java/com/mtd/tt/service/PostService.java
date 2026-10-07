@@ -759,15 +759,15 @@ public class PostService {
 
         // 当前用户视角：登录即可查真实状态（含本人，同推特）；游客一律 false
         boolean self = currentUserId != null && currentUserId.equals(post.getUserId());
-        resp.setIsMine(self);
+        resp.setMine(self);
         if (currentUserId != null) {
-            resp.setIsLiked(redisCounter.hasUser(post.getId(), RedisPostCounter.LIKE, currentUserId));
-            resp.setIsBookmarked(redisCounter.hasUser(post.getId(), RedisPostCounter.BOOKMARK, currentUserId));
-            resp.setIsReposted(redisCounter.hasUser(post.getId(), RedisPostCounter.REPOST, currentUserId));
+            resp.setLiked(redisCounter.hasUser(post.getId(), RedisPostCounter.LIKE, currentUserId));
+            resp.setBookmarked(redisCounter.hasUser(post.getId(), RedisPostCounter.BOOKMARK, currentUserId));
+            resp.setReposted(redisCounter.hasUser(post.getId(), RedisPostCounter.REPOST, currentUserId));
         } else {
-            resp.setIsLiked(false);
-            resp.setIsBookmarked(false);
-            resp.setIsReposted(false);
+            resp.setLiked(false);
+            resp.setBookmarked(false);
+            resp.setReposted(false);
         }
 
         // 被引用/被回复的原文帖子（reply/quote/repost 时返回，限制一层避免深层递归）
@@ -838,7 +838,7 @@ public class PostService {
             }
         }
         // 作者拉黑了浏览者，则不可见
-        if (userService.isBlocked(post.getUserId(), currentUserId)) {
+        if (userService.blocked(post.getUserId(), currentUserId)) {
             throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "帖子不存在");
         }
     }

@@ -165,7 +165,7 @@ public class UserService {
         requireLogin(currentUserId);
         checkNotSelf(currentUserId, followeeId);
         getActiveUser(followeeId);
-        if (isBlocked(followeeId, currentUserId)) {
+        if (blocked(followeeId, currentUserId)) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "你已被对方拉黑，无法关注");
         }
         if (isFollowing(currentUserId, followeeId)) {
@@ -351,11 +351,11 @@ public class UserService {
         resp.setStatus(user.getStatus());
         resp.setUserPrivate(user.getUserPrivate());
         resp.setPoints(user.getPoints());
-        resp.setIsAdmin(user.getIsAdmin());
+        resp.setAdmin(user.getAdmin());
         resp.setCreatedAt(user.getCreatedAt());
 
-        resp.setIsFollowed(!self && isFollowing(currentUserId, user.getId()));
-        resp.setIsBlocked(!self && isBlocked(currentUserId, user.getId()));
+        resp.setFollowed(!self && isFollowing(currentUserId, user.getId()));
+        resp.setBlocked(!self && blocked(currentUserId, user.getId()));
 
         if (needCounts) {
             resp.setFollowingCount(countFollowing(user.getId()));
@@ -406,7 +406,7 @@ public class UserService {
         return ids;
     }
 
-    public boolean isBlocked(Long userId, Long blockedUserId) {
+    public boolean blocked(Long userId, Long blockedUserId) {
         if (userId == null) {
             return false;
         }

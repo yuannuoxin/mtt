@@ -87,14 +87,14 @@ public class PostResp implements Serializable {
 
     // ===== 当前登录用户视角 =====
     @Parameter(description = "当前登录用户是否已点赞")
-    private Boolean isLiked;
+    private Boolean liked;
 
     @Parameter(description = "当前登录用户是否已收藏")
-    private Boolean isBookmarked;
+    private Boolean bookmarked;
 
     @Parameter(description = "当前登录用户是否已转发")
-    private Boolean isReposted;
+    private Boolean reposted;
 
     @Parameter(description = "是否是当前登录用户发布的")
-    private Boolean isMine;
+    private Boolean mine;
 }

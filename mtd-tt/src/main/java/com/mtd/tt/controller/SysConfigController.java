@@ -72,7 +72,7 @@ public class SysConfigController {
         }
         UserEntity user = userMapper.selectOneByQuery(
                 QueryWrapper.create().eq(UserEntity::getId, userId));
-        if (user == null || !Boolean.TRUE.equals(user.getIsAdmin())) {
+        if (user == null || !Boolean.TRUE.equals(user.getAdmin())) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "无权限，仅管理员可修改系统配置");
         }
     }
