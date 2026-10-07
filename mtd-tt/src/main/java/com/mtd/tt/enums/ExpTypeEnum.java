@@ -10,8 +10,8 @@ import lombok.Getter;
 @AllArgsConstructor
 public enum ExpTypeEnum {
 
-    POST("post", "发帖"),
-    QUOTE("quote", "引用"),
+    POST("original", "发帖"),
+    QUOTE("quote", "引用转发"),
     REPOST("repost", "转发"),
     REPLY("reply", "回复");
 
