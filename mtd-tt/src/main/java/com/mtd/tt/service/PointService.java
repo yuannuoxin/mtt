@@ -161,7 +161,22 @@ public class PointService {
         }
         long mb = Math.max(1, (sizeBytes + MB - 1) / MB);
         long cost = mb * uploadPerMb();
-        deduct(userId, cost, PointTypeEnum.UPLOAD.getCode(), "上传文件 " + mb + "MB");
+        deduct(userId, cost, PointTypeEnum.UPLOAD.getCode(), "上传文件 " + formatSize(sizeBytes));
+    }
+
+    /**
+     * 把字节数格式化为人类可读大小（B / KB / MB），用于积分记录备注。
+     */
+    private static String formatSize(long bytes) {
+        if (bytes < 1024) {
+            return bytes + "B";
+        }
+        if (bytes < 1024 * 1024) {
+            double kb = bytes / 1024.0;
+            return (kb == Math.floor(kb) ? String.format("%.0fKB", kb) : String.format("%.1fKB", kb));
+        }
+        double mb = bytes / 1024.0 / 1024.0;
+        return String.format("%.2fMB", mb);
     }
 
     /**
