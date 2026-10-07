@@ -41,6 +41,7 @@ public class SysConfigController {
             "email_code.enabled",
             "email.smtp.host", "email.smtp.port", "email.smtp.username",
             "email.smtp.password", "email.smtp.from",
+            "email.domain.blacklist",
             "points.checkin", "points.post", "points.reply",
             "points.upload_per_mb", "points.initial");
 

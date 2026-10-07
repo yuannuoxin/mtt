@@ -57,6 +57,7 @@ public class SysConfigService {
                    ('email.smtp.username', '', 'SMTP 账号'),
                    ('email.smtp.password', '', 'SMTP 密码'),
                    ('email.smtp.from', '', '发件人邮箱'),
+                   ('email.domain.blacklist', '', '注册邮箱域名黑名单（逗号分隔，空=不限制）'),
                    ('points.checkin', '1', '每日签到送积分'),
                    ('points.post', '10', '发帖/转发/引用 扣积分'),
                    ('points.reply', '2', '回复扣积分'),
