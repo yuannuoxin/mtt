@@ -136,12 +136,12 @@ public class OAuthService {
     /**
      * Google 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户。
      */
-    public OAuthCallbackResp googleCallback(String code, String redirectUri) {
+    public OAuthCallbackResp googleCallback(String code, String redirectUri, String nonce) {
         if (StrUtil.isBlank(code)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码不能为空");
         }
         ensureGoogleEnabled();
-        GoogleUserInfo info = exchangeGoogle(code, redirectUri);
+        GoogleUserInfo info = exchangeGoogle(code, redirectUri, nonce);
         if (StrUtil.isBlank(info.id())) {
             throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "获取 Google 账号信息失败");
         }
@@ -339,7 +339,7 @@ public class OAuthService {
     /**
      * 用授权码换 access_token 并拉取 Google 用户信息
      */
-    private GoogleUserInfo exchangeGoogle(String code, String redirectUri) {
+    private GoogleUserInfo exchangeGoogle(String code, String redirectUri, String nonce) {
         String clientId = configService.get(CFG_GOOGLE_CLIENT_ID);
         String clientSecret = configService.get(CFG_GOOGLE_CLIENT_SECRET);
         if (StrUtil.isBlank(clientId) || StrUtil.isBlank(clientSecret)) {
@@ -367,6 +367,24 @@ public class OAuthService {
         if (StrUtil.isBlank(accessToken)) {
             log.warn("Google token 响应异常: {}", body);
             throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 授权失败，请重试");
+        }
+        // nonce 防重放：授权时带的 nonce 应等于 Google 换回的 id_token 内 nonce（只有传了 nonce 才校验）
+        if (StrUtil.isNotBlank(nonce)) {
+            String idToken = json.getStr("id_token");
+            if (StrUtil.isBlank(idToken)) {
+                throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 授权失败，请重试");
+            }
+            try {
+                JWT jwt = JWTUtil.parseToken(idToken);
+                Object jwtNonce = jwt.getPayload("nonce");
+                if (jwtNonce == null || !nonce.equals(String.valueOf(jwtNonce))) {
+                    throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 授权校验失败");
+                }
+            } catch (BusinessException be) {
+                throw be;
+            } catch (Exception e) {
+                throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 授权校验失败");
+            }
         }
         String ub;
         try {

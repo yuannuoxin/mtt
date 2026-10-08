@@ -39,7 +39,7 @@ public class OAuthController {
     @Operation(summary = "Google 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户")
     @PostMapping("/google/callback")
     public Result<OAuthCallbackResp> googleCallback(@RequestBody OAuthCallbackReq req) {
-        return Result.success(oauthService.googleCallback(req.getCode(), req.getRedirectUri()));
+        return Result.success(oauthService.googleCallback(req.getCode(), req.getRedirectUri(), req.getNonce()));
     }
 
     @Operation(summary = "Google OIDC 登录（隐式流，后端本地验签 id_token，不跟 Google 交互）")
