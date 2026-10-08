@@ -53,6 +53,9 @@ public class OAuthService {
     private static final String CFG_GOOGLE_CLIENT_ID = "oauth.google.client_id";
     private static final String CFG_GOOGLE_CLIENT_SECRET = "oauth.google.client_secret";
     private static final String CFG_GOOGLE_REDIRECT_URI = "oauth.google.redirect_uri";
+    private static final String CFG_PROXY_ENABLED = "oauth.proxy.enabled";
+    private static final String CFG_PROXY_HOST = "oauth.proxy.host";
+    private static final String CFG_PROXY_PORT = "oauth.proxy.port";
 
     private static final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
@@ -302,7 +305,7 @@ public class OAuthService {
         }
         String body;
         try {
-            body = HttpRequest.post(GOOGLE_TOKEN_URL)
+            body = applyProxy(HttpRequest.post(GOOGLE_TOKEN_URL))
                     .form("grant_type", "authorization_code")
                     .form("code", code)
                     .form("client_id", clientId)
@@ -322,7 +325,7 @@ public class OAuthService {
         }
         String ub;
         try {
-            ub = HttpRequest.get(GOOGLE_USERINFO_URL)
+            ub = applyProxy(HttpRequest.get(GOOGLE_USERINFO_URL))
                     .header("Authorization", "Bearer " + accessToken)
                     .timeout(15000)
                     .execute().body();
@@ -332,6 +335,33 @@ public class OAuthService {
         JSONObject u = JSONUtil.parseObj(ub);
         return new GoogleUserInfo(u.getStr("id"), u.getStr("email"),
                 u.getStr("name"), u.getStr("picture"));
+    }
+
+    /**
+     * 若配置了代理（oauth.proxy.enabled/host/port），给请求挂代理。
+     * 用于本机无法直连 Google API 的场景（如需要通过代理/VPN 访问 Google）。
+     */
+    private HttpRequest applyProxy(HttpRequest req) {
+        String enabled = configService.get(CFG_PROXY_ENABLED);
+        String host = configService.get(CFG_PROXY_HOST);
+        String portStr = configService.get(CFG_PROXY_PORT);
+        if (StrUtil.isBlank(enabled) || !"true".equalsIgnoreCase(enabled.trim())) {
+            return req;
+        }
+        if (StrUtil.isBlank(host) || StrUtil.isBlank(portStr)) {
+            return req;
+        }
+        try {
+            int port = Integer.parseInt(portStr.trim());
+            if (port <= 0) {
+                return req;
+            }
+            req.setProxy(new java.net.Proxy(java.net.Proxy.Type.HTTP,
+                    new java.net.InetSocketAddress(host.trim(), port)));
+        } catch (NumberFormatException e) {
+            log.warn("oauth.proxy.port 配置非法: {}", portStr);
+        }
+        return req;
     }
 
     private void ensureGoogleEnabled() {
