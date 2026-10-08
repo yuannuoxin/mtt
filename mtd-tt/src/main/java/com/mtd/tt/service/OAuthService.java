@@ -19,6 +19,9 @@ import com.mtd.tt.mapper.OauthBindingMapper;
 import com.mtd.tt.mapper.UserMapper;
 import com.mtd.tt.model.dto.GoogleUserInfo;
 import com.mtd.tt.model.dto.OAuthProviderUser;
+import com.mtd.tt.model.dto.TelegramUserInfo;
+import com.mtd.tt.model.req.TelegramCallbackReq;
+import com.mtd.tt.model.resp.TelegramConfigResp;
 import com.mtd.tt.model.entity.OauthBindingEntity;
 import com.mtd.tt.model.entity.UserEntity;
 import com.mtd.tt.model.resp.LoginResp;
@@ -37,15 +40,23 @@ import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
 
 import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.interfaces.RSAPublicKey;
 import java.security.spec.RSAPublicKeySpec;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+import cn.hutool.crypto.digest.HMac;
+import cn.hutool.core.util.HexUtil;
 
 /**
  * 第三方登录（Google OAuth2.0 授权码流程）。
@@ -70,6 +81,11 @@ public class OAuthService {
     private static final String CFG_GITHUB_CLIENT_ID = "oauth.github.client_id";
     private static final String CFG_GITHUB_CLIENT_SECRET = "oauth.github.client_secret";
     private static final String CFG_GITHUB_REDIRECT_URI = "oauth.github.redirect_uri";
+    private static final String CFG_TELEGRAM_ENABLED = "oauth.telegram.enabled";
+    private static final String CFG_TELEGRAM_BOT_TOKEN = "oauth.telegram.bot_token";
+    private static final String CFG_TELEGRAM_BOT_USERNAME = "oauth.telegram.bot_username";
+    private static final String CFG_TELEGRAM_PUBLIC_KEY = "oauth.telegram.public_key";
+    private static final String CFG_TELEGRAM_ORIGIN = "oauth.telegram.origin";
     private static final String CFG_PROXY_ENABLED = "oauth.proxy.enabled";
     private static final String CFG_PROXY_HOST = "oauth.proxy.host";
     private static final String CFG_PROXY_PORT = "oauth.proxy.port";
@@ -241,6 +257,95 @@ public class OAuthService {
     }
 
     /**
+     * Telegram Login Widget 前端配置：bot username / public key / origin（不泄露 bot token）
+     */
+    public TelegramConfigResp telegramConfig() {
+        TelegramConfigResp r = new TelegramConfigResp();
+        r.setEnabled(configService.getBool(CFG_TELEGRAM_ENABLED, false));
+        r.setBotUsername(configService.get(CFG_TELEGRAM_BOT_USERNAME));
+        r.setPublicKey(configService.get(CFG_TELEGRAM_PUBLIC_KEY));
+        r.setOrigin(configService.get(CFG_TELEGRAM_ORIGIN));
+        return r;
+    }
+
+    /**
+     * Telegram Login Widget 回调：前端 widget 拿到已签名用户数据后 POST 至此。
+     * 后端用 bot token（sha256 作为 HMAC secret）本地验签 data_check_string，无需与 Telegram 交互。
+     * Telegram 不返回邮箱，注册时用 {id}@telegram.local 占位邮箱。
+     */
+    public OAuthCallbackResp telegramCallback(TelegramCallbackReq req) {
+        if (req == null || req.getId() == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权数据无效");
+        }
+        if (!configService.getBool(CFG_TELEGRAM_ENABLED, false)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Telegram 登录未启用");
+        }
+        TelegramUserInfo tg = verifyTelegram(req);
+        OAuthProviderUser info = new OAuthProviderUser(tg.id(),
+                tg.id() + "@" + OauthProviderEnum.TELEGRAM.getCode() + ".local", tg.name(), null);
+        OAuthCallbackResp resp = new OAuthCallbackResp();
+        Long loginUserId = LoginUtil.currentUserId();
+        if (loginUserId == null) {
+            resp.setAction("login");
+            resp.setLogin(loginByProvider(OauthProviderEnum.TELEGRAM, info));
+        } else {
+            bindProvider(OauthProviderEnum.TELEGRAM, loginUserId, info);
+            resp.setAction("bound");
+            resp.setBindings(listBindings(loginUserId));
+        }
+        return resp;
+    }
+
+    /**
+     * 校验 Telegram Login Widget 签名数据：按官方算法用 bot token 计算 HMAC-SHA256 比对 hash。
+     */
+    private TelegramUserInfo verifyTelegram(TelegramCallbackReq req) {
+        String botToken = configService.get(CFG_TELEGRAM_BOT_TOKEN);
+        if (StrUtil.isBlank(botToken)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Telegram 登录未配置");
+        }
+        long authSec = req.getAuthDate() == null ? 0 : req.getAuthDate();
+        if (authSec > 0 && (System.currentTimeMillis() / 1000 - authSec) > 24 * 3600L) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 授权已过期");
+        }
+        List<String> pairs = new ArrayList<>();
+        addTgPair(pairs, "auth_date", String.valueOf(authSec));
+        addTgPair(pairs, "first_name", req.getFirstName());
+        addTgPair(pairs, "id", String.valueOf(req.getId()));
+        addTgPair(pairs, "last_name", req.getLastName());
+        addTgPair(pairs, "photo_url", req.getPhotoUrl());
+        addTgPair(pairs, "username", req.getUsername());
+        Collections.sort(pairs);
+        String dataCheckString = String.join("\n", pairs);
+        boolean ok = false;
+        try {
+            byte[] secretKey = MessageDigest.getInstance("SHA-256")
+                    .digest(botToken.getBytes(StandardCharsets.UTF_8));
+            Mac mac = Mac.getInstance("HmacSHA256");
+            mac.init(new SecretKeySpec(secretKey, "HmacSHA256"));
+            byte[] calc = mac.doFinal(dataCheckString.getBytes(StandardCharsets.UTF_8));
+            String calcHex = HexUtil.encodeHexStr(calc);
+            ok = StrUtil.isNotBlank(req.getHash()) && calcHex.equalsIgnoreCase(req.getHash());
+        } catch (Exception e) {
+            log.warn("Telegram 验签异常: {}", e.getMessage());
+        }
+        if (!ok) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 授权校验失败");
+        }
+        String name = StrUtil.isNotBlank(req.getFirstName())
+                ? req.getFirstName() + (StrUtil.isNotBlank(req.getLastName()) ? " " + req.getLastName() : "")
+                : StrUtil.blankToDefault(req.getUsername(), "TG" + req.getId());
+        return new TelegramUserInfo(String.valueOf(req.getId()), name, req.getUsername());
+    }
+
+    private void addTgPair(List<String> pairs, String key, String value) {
+        if (StrUtil.isBlank(value)) {
+            return;
+        }
+        pairs.add(key + "=" + value);
+    }
+
+    /**
      * 当前用户三方绑定总览：系统支持的三方列表 + 已绑定明细
      */
     public OAuthBindingsResp bindings(Long userId) {
@@ -263,6 +368,9 @@ public class OAuthService {
                 item.setEnabled(configService.getBool(CFG_GITHUB_ENABLED, false));
                 item.setClientId(configService.get(CFG_GITHUB_CLIENT_ID));
                 item.setRedirectUri(configService.get(CFG_GITHUB_REDIRECT_URI));
+                item.setMode("code");
+            } else if (p == OauthProviderEnum.TELEGRAM) {
+                item.setEnabled(configService.getBool(CFG_TELEGRAM_ENABLED, false));
                 item.setMode("code");
             }
             item.setBound(binds.stream().anyMatch(b -> p.getCode().equals(b.getProvider())));
@@ -357,13 +465,18 @@ public class OAuthService {
     }
 
     /**
-     * 用三方资料自动注册新用户（无密码，可后续设置；注册送积分）
+     * 用三方资料自动注册新用户（无密码，可后续设置；注册送积分）。
+     * 无邮箱的三方（如 Telegram）用 {id}@{provider}.local 占位邮箱，保证账号体系一致。
      */
     private UserEntity registerByOAuth(OauthProviderEnum provider, OAuthProviderUser info) {
+        String email = info.email();
+        if (StrUtil.isBlank(email)) {
+            email = info.id() + "@" + provider.getCode() + ".local";
+        }
         UserEntity user = new UserEntity();
-        user.setUsername(uniqueUsername(info.email(), info.name()));
+        user.setUsername(uniqueUsername(email, info.name()));
         user.setNickname(StrUtil.isBlank(info.name()) ? user.getUsername() : info.name());
-        user.setEmail(info.email());
+        user.setEmail(email);
         user.setPasswordHash(null);
         user.setStatus(UserStatusEnum.ACTIVE.getCode());
         user.setAvatar(info.avatar());
