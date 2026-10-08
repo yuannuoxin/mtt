@@ -104,18 +104,21 @@ public class UserService {
     }
 
     /**
-     * 单独修改密码：需当前密码校验 + 新密码长度校验
+     * 单独修改/设置密码：需当前密码校验 + 新密码长度校验。
+     * 三方登录自动注册的用户没有密码（password_hash 为空），首次设置密码时不要求旧密码。
      */
     public void changePassword(Long currentUserId, ChangePasswordReq req) {
         requireLogin(currentUserId);
         turnstileService.verify(req.getTurnstileToken());
         FieldValidator.validatePassword(req.getNewPassword());
-        if (StrUtil.isBlank(req.getOldPassword())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请填写当前密码");
-        }
         UserEntity user = getActiveUser(currentUserId);
-        if (!BCrypt.checkpw(req.getOldPassword(), user.getPasswordHash())) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前密码不正确");
+        if (StrUtil.isNotBlank(user.getPasswordHash())) {
+            if (StrUtil.isBlank(req.getOldPassword())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "请填写当前密码");
+            }
+            if (!BCrypt.checkpw(req.getOldPassword(), user.getPasswordHash())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "当前密码不正确");
+            }
         }
         user.setPasswordHash(BCrypt.hashpw(req.getNewPassword(), BCrypt.gensalt()));
         userMapper.update(user);
@@ -354,6 +357,7 @@ public class UserService {
         resp.setAdmin(user.getAdmin());
         resp.setExp(user.getExp());
         resp.setLevel(user.getLevel());
+        resp.setHasPassword(self && StrUtil.isNotBlank(user.getPasswordHash()));
         resp.setCreatedAt(user.getCreatedAt());
 
         resp.setFollowed(!self && isFollowing(currentUserId, user.getId()));

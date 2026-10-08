@@ -75,4 +75,7 @@ public class UserProfileResp implements Serializable {
 
     @Parameter(description = "积分等级")
     private Integer level;
+
+    @Parameter(description = "是否已设置密码（仅本人可见；三方登录用户可能未设密码）")
+    private Boolean hasPassword;
 }
