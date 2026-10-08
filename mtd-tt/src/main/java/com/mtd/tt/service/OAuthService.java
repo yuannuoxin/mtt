@@ -139,7 +139,12 @@ public class OAuthService {
                     )
                     """);
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_oauth_bindings_user ON oauth_bindings (user_id)");
-            jdbcTemplate.execute("ALTER TABLE oauth_bindings ADD CONSTRAINT IF NOT EXISTS uk_oauth_bindings_user_provider UNIQUE (user_id, provider)");
+            // PostgreSQL 不支持 ADD CONSTRAINT IF NOT EXISTS，需先查 pg_constraint 再决定是否添加
+            Long constraintCnt = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(*) FROM pg_constraint WHERE conname = 'uk_oauth_bindings_user_provider'", Long.class);
+            if (constraintCnt == null || constraintCnt == 0) {
+                jdbcTemplate.execute("ALTER TABLE oauth_bindings ADD CONSTRAINT uk_oauth_bindings_user_provider UNIQUE (user_id, provider)");
+            }
             log.info("第三方绑定表初始化完成");
         } catch (Exception e) {
             log.error("第三方绑定表初始化失败: {}", e.getMessage(), e);
