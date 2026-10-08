@@ -134,10 +134,12 @@ public class OAuthService {
                         access_token     VARCHAR(512),
                         refresh_token    VARCHAR(512),
                         created_at       TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
-                        UNIQUE (provider, provider_user_id)
+                        UNIQUE (provider, provider_user_id),
+                        UNIQUE (user_id, provider)
                     )
                     """);
             jdbcTemplate.execute("CREATE INDEX IF NOT EXISTS idx_oauth_bindings_user ON oauth_bindings (user_id)");
+            jdbcTemplate.execute("ALTER TABLE oauth_bindings ADD CONSTRAINT IF NOT EXISTS uk_oauth_bindings_user_provider UNIQUE (user_id, provider)");
             log.info("第三方绑定表初始化完成");
         } catch (Exception e) {
             log.error("第三方绑定表初始化失败: {}", e.getMessage(), e);
