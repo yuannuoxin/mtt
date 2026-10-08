@@ -67,7 +67,11 @@ public class SysConfigService {
                    ('exp.per.quote', '3', '引用获得经验'),
                    ('exp.per.repost', '2', '转发获得经验'),
                    ('exp.per.reply', '1', '回复获得经验'),
-                   ('exp.level.thresholds', '100,300,600,1000', '经验等级挡位（逗号分隔：升到2/3/4/5级所需累计经验）')
+                   ('exp.level.thresholds', '100,300,600,1000', '经验等级挡位（逗号分隔：升到2/3/4/5级所需累计经验）'),
+                   ('oauth.google.enabled', 'false', '是否启用 Google 三方登录（true/false）'),
+                   ('oauth.google.client_id', '', 'Google OAuth Client ID'),
+                   ('oauth.google.client_secret', '', 'Google OAuth Client Secret'),
+                   ('oauth.google.redirect_uri', '', 'Google OAuth 回调地址（前端 /oauth/google/callback 完整 URL）')
             ON CONFLICT (cfg_key) DO NOTHING
             """;
 
