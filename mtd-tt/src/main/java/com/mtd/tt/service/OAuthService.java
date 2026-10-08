@@ -653,7 +653,7 @@ public class OAuthService {
     }
 
     /**
-     * 绑定（已登录模式）：三方账号已被其他用户绑定则拒绝。
+     * 绑定（已登录模式）：三方账号已被其他用户绑定则拒绝；同一本地账号对同一 provider 只允许绑定一个三方账号。
      */
     private void bindProvider(OauthProviderEnum provider, Long userId, OAuthProviderUser info) {
         OauthBindingEntity exist = findByProviderUser(provider.getCode(), info.id());
@@ -663,6 +663,13 @@ public class OAuthService {
             }
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
                     "该" + provider.getName() + "账号已被其他用户绑定");
+        }
+        long sameProviderCount = bindingMapper.selectCountByQuery(
+                QueryWrapper.create().eq(OauthBindingEntity::getUserId, userId)
+                        .eq(OauthBindingEntity::getProvider, provider.getCode()));
+        if (sameProviderCount > 0) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                    "该账号已绑定" + provider.getName() + "账号，请先解绑后再绑定新账号");
         }
         bind(provider, userId, info, null);
     }
