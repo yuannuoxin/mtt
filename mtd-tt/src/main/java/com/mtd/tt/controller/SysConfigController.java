@@ -53,6 +53,8 @@ public class SysConfigController {
             "exp.level.thresholds",
             "oauth.google.enabled", "oauth.google.client_id",
             "oauth.google.client_secret", "oauth.google.redirect_uri", "oauth.google.mode",
+            "oauth.github.enabled", "oauth.github.client_id",
+            "oauth.github.client_secret", "oauth.github.redirect_uri",
             "oauth.proxy.enabled", "oauth.proxy.host", "oauth.proxy.port");
 
     @Operation(summary = "更新控制配置（仅管理员）")

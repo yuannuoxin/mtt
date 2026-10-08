@@ -48,6 +48,18 @@ public class OAuthController {
         return Result.success(oauthService.googleOidcLogin(req.getIdToken(), req.getNonce()));
     }
 
+    @Operation(summary = "GitHub 登录前端配置（是否启用 + clientId + redirectUri）")
+    @PostMapping("/github/config")
+    public Result<OAuthProviderItem> githubConfig() {
+        return Result.success(oauthService.githubConfig());
+    }
+
+    @Operation(summary = "GitHub 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户")
+    @PostMapping("/github/callback")
+    public Result<OAuthCallbackResp> githubCallback(@RequestBody OAuthCallbackReq req) {
+        return Result.success(oauthService.githubCallback(req.getCode(), req.getRedirectUri()));
+    }
+
     @Operation(summary = "当前用户三方绑定总览（需登录）")
     @PostMapping("/bindings")
     public Result<OAuthBindingsResp> bindings() {

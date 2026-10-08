@@ -18,6 +18,7 @@ import com.mtd.tt.enums.UserStatusEnum;
 import com.mtd.tt.mapper.OauthBindingMapper;
 import com.mtd.tt.mapper.UserMapper;
 import com.mtd.tt.model.dto.GoogleUserInfo;
+import com.mtd.tt.model.dto.OAuthProviderUser;
 import com.mtd.tt.model.entity.OauthBindingEntity;
 import com.mtd.tt.model.entity.UserEntity;
 import com.mtd.tt.model.resp.LoginResp;
@@ -65,6 +66,10 @@ public class OAuthService {
     private static final String CFG_GOOGLE_CLIENT_SECRET = "oauth.google.client_secret";
     private static final String CFG_GOOGLE_REDIRECT_URI = "oauth.google.redirect_uri";
     private static final String CFG_GOOGLE_MODE = "oauth.google.mode";
+    private static final String CFG_GITHUB_ENABLED = "oauth.github.enabled";
+    private static final String CFG_GITHUB_CLIENT_ID = "oauth.github.client_id";
+    private static final String CFG_GITHUB_CLIENT_SECRET = "oauth.github.client_secret";
+    private static final String CFG_GITHUB_REDIRECT_URI = "oauth.github.redirect_uri";
     private static final String CFG_PROXY_ENABLED = "oauth.proxy.enabled";
     private static final String CFG_PROXY_HOST = "oauth.proxy.host";
     private static final String CFG_PROXY_PORT = "oauth.proxy.port";
@@ -72,6 +77,10 @@ public class OAuthService {
     private static final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
     private static final String GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
+    private static final String GITHUB_AUTHORIZE_URL = "https://github.com/login/oauth/authorize";
+    private static final String GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
+    private static final String GITHUB_USER_URL = "https://api.github.com/user";
+    private static final String GITHUB_EMAILS_URL = "https://api.github.com/user/emails";
 
     @Autowired
     private SysConfigService configService;
@@ -149,9 +158,9 @@ public class OAuthService {
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
             resp.setAction("login");
-            resp.setLogin(loginByGoogle(info));
+            resp.setLogin(loginByProvider(OauthProviderEnum.GOOGLE, toProviderUser(info)));
         } else {
-            bindGoogle(loginUserId, info);
+            bindProvider(OauthProviderEnum.GOOGLE, loginUserId, toProviderUser(info));
             resp.setAction("bound");
             resp.setBindings(listBindings(loginUserId));
         }
@@ -168,14 +177,63 @@ public class OAuthService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Google 登录凭证不能为空");
         }
         ensureGoogleEnabled();
-        GoogleUserInfo info = verifyGoogleIdToken(idToken, nonce);
+        OAuthProviderUser info = toProviderUser(verifyGoogleIdToken(idToken, nonce));
         OAuthCallbackResp resp = new OAuthCallbackResp();
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
             resp.setAction("login");
-            resp.setLogin(loginByGoogle(info));
+            resp.setLogin(loginByProvider(OauthProviderEnum.GOOGLE, info));
         } else {
-            bindGoogle(loginUserId, info);
+            bindProvider(OauthProviderEnum.GOOGLE, loginUserId, info);
+            resp.setAction("bound");
+            resp.setBindings(listBindings(loginUserId));
+        }
+        return resp;
+    }
+
+    /**
+     * GitHub 登录前端配置：是否启用 + clientId + redirectUri（不泄露 secret）
+     */
+    public OAuthProviderItem githubConfig() {
+        OAuthProviderItem item = new OAuthProviderItem();
+        item.setProvider(OauthProviderEnum.GITHUB.getCode());
+        item.setName(OauthProviderEnum.GITHUB.getName());
+        item.setEnabled(configService.getBool(CFG_GITHUB_ENABLED, false));
+        item.setClientId(configService.get(CFG_GITHUB_CLIENT_ID));
+        item.setRedirectUri(configService.get(CFG_GITHUB_REDIRECT_URI));
+        item.setMode("code");
+        Long userId = LoginUtil.currentUserId();
+        if (userId != null) {
+            long cnt = bindingMapper.selectCountByQuery(
+                    QueryWrapper.create().eq(OauthBindingEntity::getUserId, userId)
+                            .eq(OauthBindingEntity::getProvider, OauthProviderEnum.GITHUB.getCode()));
+            item.setBound(cnt > 0);
+        }
+        return item;
+    }
+
+    /**
+     * GitHub 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户。
+     * GitHub 仅支持授权码模式（无用户 id_token），始终走 code 换 token。
+     */
+    public OAuthCallbackResp githubCallback(String code, String redirectUri) {
+        if (StrUtil.isBlank(code)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码不能为空");
+        }
+        if (!configService.getBool(CFG_GITHUB_ENABLED, false)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "GitHub 登录未启用");
+        }
+        OAuthProviderUser info = exchangeGithub(code, redirectUri);
+        if (StrUtil.isBlank(info.id())) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "获取 GitHub 账号信息失败");
+        }
+        OAuthCallbackResp resp = new OAuthCallbackResp();
+        Long loginUserId = LoginUtil.currentUserId();
+        if (loginUserId == null) {
+            resp.setAction("login");
+            resp.setLogin(loginByProvider(OauthProviderEnum.GITHUB, info));
+        } else {
+            bindProvider(OauthProviderEnum.GITHUB, loginUserId, info);
             resp.setAction("bound");
             resp.setBindings(listBindings(loginUserId));
         }
@@ -201,6 +259,11 @@ public class OAuthService {
                 item.setClientId(configService.get(CFG_GOOGLE_CLIENT_ID));
                 item.setRedirectUri(configService.get(CFG_GOOGLE_REDIRECT_URI));
                 item.setMode(StrUtil.blankToDefault(configService.get(CFG_GOOGLE_MODE), "code"));
+            } else if (p == OauthProviderEnum.GITHUB) {
+                item.setEnabled(configService.getBool(CFG_GITHUB_ENABLED, false));
+                item.setClientId(configService.get(CFG_GITHUB_CLIENT_ID));
+                item.setRedirectUri(configService.get(CFG_GITHUB_REDIRECT_URI));
+                item.setMode("code");
             }
             item.setBound(binds.stream().anyMatch(b -> p.getCode().equals(b.getProvider())));
             providers.add(item);
@@ -236,72 +299,74 @@ public class OAuthService {
     }
 
     /**
-     * 登录/自动注册（未登录模式）
+     * 登录/自动注册（未登录模式，provider 无关）
      */
-    private LoginResp loginByGoogle(GoogleUserInfo info) {
-        OauthBindingEntity bind = findByProviderUser(OauthProviderEnum.GOOGLE.getCode(), info.id());
+    private LoginResp loginByProvider(OauthProviderEnum provider, OAuthProviderUser info) {
+        String providerCode = provider.getCode();
+        OauthBindingEntity bind = findByProviderUser(providerCode, info.id());
         if (bind != null) {
             UserEntity user = userMapper.selectOneByQuery(
                     QueryWrapper.create().eq(UserEntity::getId, bind.getUserId()));
             checkCanLogin(user);
             return doLogin(user);
         }
-        // 未绑定：用 Google 邮箱查本地用户。Google 返回的邮箱是经过 Google 验证的本人邮箱，
-        // 邮箱一致即证明该 Google 账号属于该本地账号，自动绑定并直接登录（体验更顺）。
-        // 仅当该 Google 已被其他账号绑定时拒绝（防接管）。
+        // 未绑定：用三方邮箱查本地用户。邮箱一致即证明该三方账号属于该本地账号，自动绑定并直接登录。
+        // 仅当该三方账号已被其他账号绑定时拒绝（防接管）。
         UserEntity byEmail = StrUtil.isBlank(info.email()) ? null
                 : userMapper.selectOneByQuery(QueryWrapper.create().eq(UserEntity::getEmail, info.email()));
         if (byEmail != null) {
-            OauthBindingEntity other = findByProviderUser(OauthProviderEnum.GOOGLE.getCode(), info.id());
+            OauthBindingEntity other = findByProviderUser(providerCode, info.id());
             if (other != null && !other.getUserId().equals(byEmail.getId())) {
-                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该 Google 账号已绑定其他账号");
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                        "该" + provider.getName() + "账号已绑定其他账号");
             }
-            bind(byEmail.getId(), info, null);
+            bind(provider, byEmail.getId(), info, null);
             return doLogin(byEmail);
         }
-        UserEntity user = registerByOAuth(info);
-        bind(user.getId(), info, null);
+        UserEntity user = registerByOAuth(provider, info);
+        bind(provider, user.getId(), info, null);
         return doLogin(user);
     }
 
     /**
-     * 绑定（已登录模式）：Google 账号已被其他用户绑定则拒绝。
+     * 绑定（已登录模式）：三方账号已被其他用户绑定则拒绝。
      */
-    private void bindGoogle(Long userId, GoogleUserInfo info) {
-        OauthBindingEntity exist = findByProviderUser(OauthProviderEnum.GOOGLE.getCode(), info.id());
+    private void bindProvider(OauthProviderEnum provider, Long userId, OAuthProviderUser info) {
+        OauthBindingEntity exist = findByProviderUser(provider.getCode(), info.id());
         if (exist != null) {
             if (exist.getUserId().equals(userId)) {
                 return; // 已绑定到当前用户，幂等
             }
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该 Google 账号已被其他用户绑定");
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                    "该" + provider.getName() + "账号已被其他用户绑定");
         }
-        bind(userId, info, null);
+        bind(provider, userId, info, null);
     }
 
-    private void bind(Long userId, GoogleUserInfo info, String accessToken) {
+    private void bind(OauthProviderEnum provider, Long userId, OAuthProviderUser info, String accessToken) {
         OauthBindingEntity b = new OauthBindingEntity();
         b.setUserId(userId);
-        b.setProvider(OauthProviderEnum.GOOGLE.getCode());
+        b.setProvider(provider.getCode());
         b.setProviderUserId(info.id());
         b.setEmail(info.email());
         b.setDisplayName(info.name());
-        b.setAvatar(info.picture());
+        b.setAvatar(info.avatar());
         b.setAccessToken(accessToken);
         b.setCreatedAt(OffsetDateTime.now());
         bindingMapper.insertSelective(b);
     }
 
     /**
-     * 用 Google 资料自动注册新用户（无密码，可后续设置；注册送积分）
+     * 用三方资料自动注册新用户（无密码，可后续设置；注册送积分）
      */
-    private UserEntity registerByOAuth(GoogleUserInfo info) {
+    private UserEntity registerByOAuth(OauthProviderEnum provider, OAuthProviderUser info) {
         UserEntity user = new UserEntity();
         user.setUsername(uniqueUsername(info.email(), info.name()));
         user.setNickname(StrUtil.isBlank(info.name()) ? user.getUsername() : info.name());
         user.setEmail(info.email());
         user.setPasswordHash(null);
         user.setStatus(UserStatusEnum.ACTIVE.getCode());
-        user.setAvatar(info.picture());
+        user.setAvatar(info.avatar());
         user.setPoints((long) pointService.initialPoint());
         userMapper.insertSelective(user);
         pointService.grantRegisterPoints(user.getId());
@@ -398,6 +463,100 @@ public class OAuthService {
         JSONObject u = JSONUtil.parseObj(ub);
         return new GoogleUserInfo(u.getStr("id"), u.getStr("email"),
                 u.getStr("name"), u.getStr("picture"));
+    }
+
+    /**
+     * 用授权码换 access_token 并拉取 GitHub 用户信息。
+     * GitHub 不提供 OIDC 用户 id_token，仅支持授权码模式；邮箱默认非公开，需 scope=user:email 并拉 /user/emails。
+     */
+    private OAuthProviderUser exchangeGithub(String code, String redirectUri) {
+        String clientId = configService.get(CFG_GITHUB_CLIENT_ID);
+        String clientSecret = configService.get(CFG_GITHUB_CLIENT_SECRET);
+        if (StrUtil.isBlank(clientId) || StrUtil.isBlank(clientSecret)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "GitHub 登录未配置");
+        }
+        if (StrUtil.isBlank(redirectUri)) {
+            redirectUri = configService.get(CFG_GITHUB_REDIRECT_URI);
+        }
+        String tokenBody;
+        try {
+            tokenBody = applyProxy(HttpRequest.post(GITHUB_TOKEN_URL))
+                    .header("Accept", "application/json")
+                    .form("client_id", clientId)
+                    .form("client_secret", clientSecret)
+                    .form("code", code)
+                    .form("redirect_uri", StrUtil.blankToDefault(redirectUri, ""))
+                    .timeout(15000)
+                    .execute().body();
+        } catch (Exception e) {
+            log.warn("GitHub 换 token 失败: {}", e.getMessage());
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "GitHub 授权失败，请重试");
+        }
+        JSONObject tokenJson = JSONUtil.parseObj(tokenBody);
+        String accessToken = tokenJson.getStr("access_token");
+        if (StrUtil.isBlank(accessToken)) {
+            log.warn("GitHub token 响应异常: {}", tokenBody);
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "GitHub 授权失败，请重试");
+        }
+        String userBody;
+        try {
+            userBody = applyProxy(HttpRequest.get(GITHUB_USER_URL))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .timeout(15000)
+                    .execute().body();
+        } catch (Exception e) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "获取 GitHub 账号信息失败");
+        }
+        JSONObject u = JSONUtil.parseObj(userBody);
+        String id = String.valueOf(u.get("id"));
+        String email = u.getStr("email"); // 邮箱非公开时可能为空
+        if (StrUtil.isBlank(email)) {
+            email = primaryGithubEmail(accessToken);
+        }
+        if (StrUtil.isBlank(email)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(),
+                    "无法获取 GitHub 邮箱，请将 GitHub 邮箱设为公开或用主邮箱验证");
+        }
+        return new OAuthProviderUser(id, email, StrUtil.blankToDefault(u.getStr("name"), u.getStr("login")),
+                u.getStr("avatar_url"));
+    }
+
+    /**
+     * 拉取 GitHub 主邮箱（scope=user:email 时 /user/emails 可返回验证过的邮箱）。
+     */
+    private String primaryGithubEmail(String accessToken) {
+        try {
+            String body = applyProxy(HttpRequest.get(GITHUB_EMAILS_URL))
+                    .header("Authorization", "Bearer " + accessToken)
+                    .header("Accept", "application/vnd.github+json")
+                    .timeout(15000)
+                    .execute().body();
+            JSONArray arr = JSONUtil.parseArray(body);
+            if (arr == null) {
+                return null;
+            }
+            for (int i = 0; i < arr.size(); i++) {
+                JSONObject it = arr.getJSONObject(i);
+                if (Boolean.TRUE.equals(it.getBool("primary"))) {
+                    return it.getStr("email");
+                }
+            }
+            for (int i = 0; i < arr.size(); i++) {
+                JSONObject it = arr.getJSONObject(i);
+                if (StrUtil.isNotBlank(it.getStr("email"))) {
+                    return it.getStr("email");
+                }
+            }
+        } catch (Exception e) {
+            log.warn("拉取 GitHub 邮箱失败: {}", e.getMessage());
+        }
+        return null;
+    }
+
+    /** Google userinfo → provider 无关的三方用户视图 */
+    private OAuthProviderUser toProviderUser(GoogleUserInfo g) {
+        return new OAuthProviderUser(g.id(), g.email(), g.name(), g.picture());
     }
 
     /**
