@@ -207,12 +207,18 @@ public class OAuthService {
             checkCanLogin(user);
             return doLogin(user);
         }
-        // 未绑定：用 Google 邮箱查本地用户
+        // 未绑定：用 Google 邮箱查本地用户。Google 返回的邮箱是经过 Google 验证的本人邮箱，
+        // 邮箱一致即证明该 Google 账号属于该本地账号，自动绑定并直接登录（体验更顺）。
+        // 仅当该 Google 已被其他账号绑定时拒绝（防接管）。
         UserEntity byEmail = StrUtil.isBlank(info.email()) ? null
                 : userMapper.selectOneByQuery(QueryWrapper.create().eq(UserEntity::getEmail, info.email()));
         if (byEmail != null) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
-                    "该 Google 邮箱已注册，请先登录本地账号后再绑定");
+            OauthBindingEntity other = findByProviderUser(OauthProviderEnum.GOOGLE.getCode(), info.id());
+            if (other != null && !other.getUserId().equals(byEmail.getId())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该 Google 账号已绑定其他账号");
+            }
+            bind(byEmail.getId(), info, null);
+            return doLogin(byEmail);
         }
         UserEntity user = registerByOAuth(info);
         bind(user.getId(), info, null);
