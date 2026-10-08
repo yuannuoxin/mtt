@@ -19,9 +19,6 @@ import com.mtd.tt.mapper.OauthBindingMapper;
 import com.mtd.tt.mapper.UserMapper;
 import com.mtd.tt.model.dto.GoogleUserInfo;
 import com.mtd.tt.model.dto.OAuthProviderUser;
-import com.mtd.tt.model.dto.TelegramUserInfo;
-import com.mtd.tt.model.req.TelegramCallbackReq;
-import com.mtd.tt.model.resp.TelegramConfigResp;
 import com.mtd.tt.model.entity.OauthBindingEntity;
 import com.mtd.tt.model.entity.UserEntity;
 import com.mtd.tt.model.resp.LoginResp;
@@ -82,10 +79,9 @@ public class OAuthService {
     private static final String CFG_GITHUB_CLIENT_SECRET = "oauth.github.client_secret";
     private static final String CFG_GITHUB_REDIRECT_URI = "oauth.github.redirect_uri";
     private static final String CFG_TELEGRAM_ENABLED = "oauth.telegram.enabled";
-    private static final String CFG_TELEGRAM_BOT_TOKEN = "oauth.telegram.bot_token";
-    private static final String CFG_TELEGRAM_BOT_USERNAME = "oauth.telegram.bot_username";
-    private static final String CFG_TELEGRAM_PUBLIC_KEY = "oauth.telegram.public_key";
-    private static final String CFG_TELEGRAM_ORIGIN = "oauth.telegram.origin";
+    private static final String CFG_TELEGRAM_CLIENT_ID = "oauth.telegram.client_id";
+    private static final String CFG_TELEGRAM_CLIENT_SECRET = "oauth.telegram.client_secret";
+    private static final String CFG_TELEGRAM_REDIRECT_URI = "oauth.telegram.redirect_uri";
     private static final String CFG_PROXY_ENABLED = "oauth.proxy.enabled";
     private static final String CFG_PROXY_HOST = "oauth.proxy.host";
     private static final String CFG_PROXY_PORT = "oauth.proxy.port";
@@ -97,6 +93,9 @@ public class OAuthService {
     private static final String GITHUB_TOKEN_URL = "https://github.com/login/oauth/access_token";
     private static final String GITHUB_USER_URL = "https://api.github.com/user";
     private static final String GITHUB_EMAILS_URL = "https://api.github.com/user/emails";
+    private static final String TELEGRAM_AUTHORIZE_URL = "https://oauth.telegram.org/auth";
+    private static final String TELEGRAM_TOKEN_URL = "https://oauth.telegram.org/token";
+    private static final String TELEGRAM_JWKS_URL = "https://oauth.telegram.org/.well-known/jwks.json";
 
     @Autowired
     private SysConfigService configService;
@@ -257,32 +256,42 @@ public class OAuthService {
     }
 
     /**
-     * Telegram Login Widget 前端配置：bot username / public key / origin（不泄露 bot token）
+     * Telegram OIDC 前端配置：clientId + redirectUri（不泄露 secret），授权码 + PKCE 流程。
      */
-    public TelegramConfigResp telegramConfig() {
-        TelegramConfigResp r = new TelegramConfigResp();
-        r.setEnabled(configService.getBool(CFG_TELEGRAM_ENABLED, false));
-        r.setBotUsername(configService.get(CFG_TELEGRAM_BOT_USERNAME));
-        r.setPublicKey(configService.get(CFG_TELEGRAM_PUBLIC_KEY));
-        r.setOrigin(configService.get(CFG_TELEGRAM_ORIGIN));
-        return r;
+    public OAuthProviderItem telegramConfig() {
+        OAuthProviderItem item = new OAuthProviderItem();
+        item.setProvider(OauthProviderEnum.TELEGRAM.getCode());
+        item.setName(OauthProviderEnum.TELEGRAM.getName());
+        item.setEnabled(configService.getBool(CFG_TELEGRAM_ENABLED, false));
+        item.setClientId(configService.get(CFG_TELEGRAM_CLIENT_ID));
+        item.setRedirectUri(configService.get(CFG_TELEGRAM_REDIRECT_URI));
+        item.setMode("code");
+        Long userId = LoginUtil.currentUserId();
+        if (userId != null) {
+            long cnt = bindingMapper.selectCountByQuery(
+                    QueryWrapper.create().eq(OauthBindingEntity::getUserId, userId)
+                            .eq(OauthBindingEntity::getProvider, OauthProviderEnum.TELEGRAM.getCode()));
+            item.setBound(cnt > 0);
+        }
+        return item;
     }
 
     /**
-     * Telegram Login Widget 回调：前端 widget 拿到已签名用户数据后 POST 至此。
-     * 后端用 bot token（sha256 作为 HMAC secret）本地验签 data_check_string，无需与 Telegram 交互。
+     * Telegram OIDC 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户。
+     * 用 client_id:client_secret Basic 认证换 id_token，本地 JWKS 验签（iss/aud/exp）。
      * Telegram 不返回邮箱，注册时用 {id}@telegram.local 占位邮箱。
      */
-    public OAuthCallbackResp telegramCallback(TelegramCallbackReq req) {
-        if (req == null || req.getId() == null) {
-            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权数据无效");
+    public OAuthCallbackResp telegramCallback(String code, String redirectUri, String codeVerifier) {
+        if (StrUtil.isBlank(code)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码不能为空");
         }
         if (!configService.getBool(CFG_TELEGRAM_ENABLED, false)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Telegram 登录未启用");
         }
-        TelegramUserInfo tg = verifyTelegram(req);
-        OAuthProviderUser info = new OAuthProviderUser(tg.id(),
-                tg.id() + "@" + OauthProviderEnum.TELEGRAM.getCode() + ".local", tg.name(), null);
+        OAuthProviderUser info = exchangeTelegram(code, redirectUri, codeVerifier);
+        if (StrUtil.isBlank(info.id())) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "获取 Telegram 账号信息失败");
+        }
         OAuthCallbackResp resp = new OAuthCallbackResp();
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
@@ -297,52 +306,136 @@ public class OAuthService {
     }
 
     /**
-     * 校验 Telegram Login Widget 签名数据：按官方算法用 bot token 计算 HMAC-SHA256 比对 hash。
+     * Telegram OIDC：用授权码换 id_token 并本地验签，解析用户 claims。
      */
-    private TelegramUserInfo verifyTelegram(TelegramCallbackReq req) {
-        String botToken = configService.get(CFG_TELEGRAM_BOT_TOKEN);
-        if (StrUtil.isBlank(botToken)) {
+    private OAuthProviderUser exchangeTelegram(String code, String redirectUri, String codeVerifier) {
+        String clientId = configService.get(CFG_TELEGRAM_CLIENT_ID);
+        String clientSecret = configService.get(CFG_TELEGRAM_CLIENT_SECRET);
+        if (StrUtil.isBlank(clientId) || StrUtil.isBlank(clientSecret)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Telegram 登录未配置");
         }
-        long authSec = req.getAuthDate() == null ? 0 : req.getAuthDate();
-        if (authSec > 0 && (System.currentTimeMillis() / 1000 - authSec) > 24 * 3600L) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 授权已过期");
+        if (StrUtil.isBlank(redirectUri)) {
+            redirectUri = configService.get(CFG_TELEGRAM_REDIRECT_URI);
         }
-        List<String> pairs = new ArrayList<>();
-        addTgPair(pairs, "auth_date", String.valueOf(authSec));
-        addTgPair(pairs, "first_name", req.getFirstName());
-        addTgPair(pairs, "id", String.valueOf(req.getId()));
-        addTgPair(pairs, "last_name", req.getLastName());
-        addTgPair(pairs, "photo_url", req.getPhotoUrl());
-        addTgPair(pairs, "username", req.getUsername());
-        Collections.sort(pairs);
-        String dataCheckString = String.join("\n", pairs);
-        boolean ok = false;
+        String basic = Base64.getEncoder().encodeToString((clientId + ":" + clientSecret).getBytes(StandardCharsets.UTF_8));
+        String tokenBody;
         try {
-            byte[] secretKey = MessageDigest.getInstance("SHA-256")
-                    .digest(botToken.getBytes(StandardCharsets.UTF_8));
-            Mac mac = Mac.getInstance("HmacSHA256");
-            mac.init(new SecretKeySpec(secretKey, "HmacSHA256"));
-            byte[] calc = mac.doFinal(dataCheckString.getBytes(StandardCharsets.UTF_8));
-            String calcHex = HexUtil.encodeHexStr(calc);
-            ok = StrUtil.isNotBlank(req.getHash()) && calcHex.equalsIgnoreCase(req.getHash());
+            tokenBody = applyProxy(HttpRequest.post(TELEGRAM_TOKEN_URL))
+                    .header("Authorization", "Basic " + basic)
+                    .header("Accept", "application/json")
+                    .form("grant_type", "authorization_code")
+                    .form("code", code)
+                    .form("redirect_uri", StrUtil.blankToDefault(redirectUri, ""))
+                    .form("client_id", clientId)
+                    .form("code_verifier", StrUtil.blankToDefault(codeVerifier, ""))
+                    .timeout(15000)
+                    .execute().body();
         } catch (Exception e) {
-            log.warn("Telegram 验签异常: {}", e.getMessage());
+            log.warn("Telegram 换 token 失败: {}", e.getMessage());
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 授权失败，请重试");
         }
-        if (!ok) {
-            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 授权校验失败");
+        JSONObject tokenJson = JSONUtil.parseObj(tokenBody);
+        String idToken = tokenJson.getStr("id_token");
+        if (StrUtil.isBlank(idToken)) {
+            log.warn("Telegram token 响应异常: {}", tokenBody);
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 授权失败，请重试");
         }
-        String name = StrUtil.isNotBlank(req.getFirstName())
-                ? req.getFirstName() + (StrUtil.isNotBlank(req.getLastName()) ? " " + req.getLastName() : "")
-                : StrUtil.blankToDefault(req.getUsername(), "TG" + req.getId());
-        return new TelegramUserInfo(String.valueOf(req.getId()), name, req.getUsername());
+        JSONObject claims = verifyTelegramIdToken(idToken);
+        String id = StrUtil.blankToDefault(claims.getStr("sub"), String.valueOf(claims.get("id")));
+        String name = StrUtil.blankToDefault(claims.getStr("name"),
+                StrUtil.blankToDefault(claims.getStr("preferred_username"), id));
+        return new OAuthProviderUser(id, id + "@" + OauthProviderEnum.TELEGRAM.getCode() + ".local",
+                name, claims.getStr("picture"));
     }
 
-    private void addTgPair(List<String> pairs, String key, String value) {
-        if (StrUtil.isBlank(value)) {
-            return;
+    /**
+     * 本地校验 Telegram id_token：iss=oauth.telegram.org、aud=client_id、exp 未过期，JWKS 公钥 RS256 验签。
+     */
+    private JSONObject verifyTelegramIdToken(String idToken) {
+        String clientId = configService.get(CFG_TELEGRAM_CLIENT_ID);
+        JWT jwt;
+        try {
+            jwt = JWTUtil.parseToken(idToken);
+        } catch (Exception e) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 登录凭证无效");
         }
-        pairs.add(key + "=" + value);
+        JSONObject payload = jwt.getPayloads();
+        String iss = payload.getStr("iss");
+        String aud = payload.getStr("aud");
+        Long exp = payload.getLong("exp");
+        if (!"https://oauth.telegram.org".equals(iss)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 登录凭证无效");
+        }
+        if (StrUtil.isNotBlank(clientId) && !clientId.equals(aud)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 登录凭证无效");
+        }
+        if (exp == null || exp * 1000 <= System.currentTimeMillis() - 60_000) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 登录凭证已过期");
+        }
+        Object kidObj = jwt.getHeader("kid");
+        RSAPublicKey pub = kidObj == null ? null : telegramJwksPublicKey(String.valueOf(kidObj));
+        if (pub == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 登录凭证校验失败");
+        }
+        try {
+            JWTUtil.verify(idToken, JWTSignerUtil.rs256(pub));
+        } catch (Exception e) {
+            log.warn("Telegram id_token 签名校验失败: {}", e.getMessage());
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Telegram 登录凭证校验失败");
+        }
+        return payload;
+    }
+
+    // ---- Telegram JWKS（OIDC 公钥）----
+    private volatile Map<String, RSAPublicKey> telegramJwksKeys = new HashMap<>();
+    private volatile long telegramJwksFetchedAt = 0;
+
+    private RSAPublicKey telegramJwksPublicKey(String kid) {
+        if (StrUtil.isBlank(kid)) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        if (telegramJwksKeys.containsKey(kid) && now - telegramJwksFetchedAt < JWKS_TTL_MS) {
+            return telegramJwksKeys.get(kid);
+        }
+        synchronized (this) {
+            if (now - telegramJwksFetchedAt > JWKS_TTL_MS || !telegramJwksKeys.containsKey(kid)) {
+                fetchTelegramJwks();
+            }
+            return telegramJwksKeys.get(kid);
+        }
+    }
+
+    private void fetchTelegramJwks() {
+        try {
+            String body = applyProxy(HttpRequest.get(TELEGRAM_JWKS_URL)).timeout(15000).execute().body();
+            JSONObject json = JSONUtil.parseObj(body);
+            JSONArray keys = json.getJSONArray("keys");
+            Map<String, RSAPublicKey> m = new HashMap<>();
+            if (keys != null) {
+                for (int i = 0; i < keys.size(); i++) {
+                    JSONObject k = keys.getJSONObject(i);
+                    String kid = k.getStr("kid");
+                    String n = k.getStr("n");
+                    String e = k.getStr("e");
+                    if (kid == null || n == null || e == null) {
+                        continue;
+                    }
+                    try {
+                        byte[] nb = Base64.getUrlDecoder().decode(n);
+                        byte[] eb = Base64.getUrlDecoder().decode(e);
+                        RSAPublicKeySpec spec = new RSAPublicKeySpec(new BigInteger(1, nb), new BigInteger(1, eb));
+                        m.put(kid, (RSAPublicKey) KeyFactory.getInstance("RSA").generatePublic(spec));
+                    } catch (Exception ex) {
+                        log.warn("解析 Telegram JWK 失败: {}", ex.getMessage());
+                    }
+                }
+            }
+            telegramJwksKeys = m;
+            telegramJwksFetchedAt = System.currentTimeMillis();
+        } catch (Exception e) {
+            log.warn("拉取 Telegram JWKS 失败: {}", e.getMessage());
+        }
     }
 
     /**
@@ -371,6 +464,8 @@ public class OAuthService {
                 item.setMode("code");
             } else if (p == OauthProviderEnum.TELEGRAM) {
                 item.setEnabled(configService.getBool(CFG_TELEGRAM_ENABLED, false));
+                item.setClientId(configService.get(CFG_TELEGRAM_CLIENT_ID));
+                item.setRedirectUri(configService.get(CFG_TELEGRAM_REDIRECT_URI));
                 item.setMode("code");
             }
             item.setBound(binds.stream().anyMatch(b -> p.getCode().equals(b.getProvider())));

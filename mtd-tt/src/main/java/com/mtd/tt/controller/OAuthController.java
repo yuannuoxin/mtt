@@ -6,11 +6,9 @@ import com.mtd.common.core.result.ResultCode;
 import com.mtd.tt.model.req.OAuthCallbackReq;
 import com.mtd.tt.model.req.OAuthOidcReq;
 import com.mtd.tt.model.req.OAuthUnbindReq;
-import com.mtd.tt.model.req.TelegramCallbackReq;
 import com.mtd.tt.model.resp.OAuthBindingsResp;
 import com.mtd.tt.model.resp.OAuthCallbackResp;
 import com.mtd.tt.model.resp.OAuthProviderItem;
-import com.mtd.tt.model.resp.TelegramConfigResp;
 import com.mtd.tt.service.OAuthService;
 import com.mtd.tt.util.LoginUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -62,16 +60,16 @@ public class OAuthController {
         return Result.success(oauthService.githubCallback(req.getCode(), req.getRedirectUri()));
     }
 
-    @Operation(summary = "Telegram Login Widget 前端配置（bot username / public key / origin）")
+    @Operation(summary = "Telegram OIDC 前端配置（是否启用 + clientId + redirectUri）")
     @PostMapping("/telegram/config")
-    public Result<TelegramConfigResp> telegramConfig() {
+    public Result<OAuthProviderItem> telegramConfig() {
         return Result.success(oauthService.telegramConfig());
     }
 
-    @Operation(summary = "Telegram Login Widget 回调：本地验签后未登录=登录/自动注册，已登录=绑定")
+    @Operation(summary = "Telegram OIDC 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户")
     @PostMapping("/telegram/callback")
-    public Result<OAuthCallbackResp> telegramCallback(@RequestBody TelegramCallbackReq req) {
-        return Result.success(oauthService.telegramCallback(req));
+    public Result<OAuthCallbackResp> telegramCallback(@RequestBody OAuthCallbackReq req) {
+        return Result.success(oauthService.telegramCallback(req.getCode(), req.getRedirectUri(), req.getCodeVerifier()));
     }
 
     @Operation(summary = "当前用户三方绑定总览（需登录）")

@@ -78,10 +78,9 @@ public class SysConfigService {
                    ('oauth.github.client_secret', '', 'GitHub OAuth App Client Secret'),
                    ('oauth.github.redirect_uri', '', 'GitHub OAuth 回调地址（前端 /oauth/github/callback 完整 URL）'),
                    ('oauth.telegram.enabled', 'false', 'Telegram 登录是否启用'),
-                   ('oauth.telegram.bot_token', '', 'Telegram Bot Token（后端本地验签 secret）'),
-                   ('oauth.telegram.bot_username', '', 'Telegram Bot 用户名（前端 Login Widget 用）'),
-                   ('oauth.telegram.public_key', '', 'Telegram Login Widget 公钥（前端用）'),
-                   ('oauth.telegram.origin', '', 'Telegram Login Widget 站点源（前端所在域名）'),
+                   ('oauth.telegram.client_id', '', 'Telegram OIDC Client ID（BotFather Login Widget 提供）'),
+                   ('oauth.telegram.client_secret', '', 'Telegram OIDC Client Secret'),
+                   ('oauth.telegram.redirect_uri', '', 'Telegram OIDC 回调地址（前端 /oauth/telegram/callback 完整 URL）'),
                    ('oauth.proxy.enabled', 'false', 'Google API 请求是否走代理（本机无法直连时开启 true）'),
                    ('oauth.proxy.host', '', '代理主机，如 127.0.0.1'),
                    ('oauth.proxy.port', '', '代理端口，如 10808')
