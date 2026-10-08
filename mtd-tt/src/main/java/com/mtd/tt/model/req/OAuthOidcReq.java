@@ -6,4 +6,6 @@ import lombok.Data;
 @Data
 public class OAuthOidcReq {
     private String idToken;
+    /** 授权请求中携带的 nonce（防重放），后端需与 id_token 内 nonce 比对 */
+    private String nonce;
 }

@@ -163,12 +163,12 @@ public class OAuthService {
      * 前端授权回调直接拿到 id_token（JWT），后端用 Google JWKS 公钥本地验签，
      * 校验 iss/aud/exp/sub 后复用登录/绑定逻辑。适用于无法直连 Google API（换 token）的环境。
      */
-    public OAuthCallbackResp googleOidcLogin(String idToken) {
+    public OAuthCallbackResp googleOidcLogin(String idToken, String nonce) {
         if (StrUtil.isBlank(idToken)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Google 登录凭证不能为空");
         }
         ensureGoogleEnabled();
-        GoogleUserInfo info = verifyGoogleIdToken(idToken);
+        GoogleUserInfo info = verifyGoogleIdToken(idToken, nonce);
         OAuthCallbackResp resp = new OAuthCallbackResp();
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
@@ -421,9 +421,9 @@ public class OAuthService {
     private volatile long jwksFetchedAt = 0;
 
     /**
-     * 本地校验 Google id_token：先看 iss/aud/exp/sub/email_verified，再用 JWKS 公钥验签。
+     * 本地校验 Google id_token：先看 iss/aud/exp/sub/email_verified/nonce，再用 JWKS 公钥验签。
      */
-    private GoogleUserInfo verifyGoogleIdToken(String idToken) {
+    private GoogleUserInfo verifyGoogleIdToken(String idToken, String nonce) {
         String clientId = configService.get(CFG_GOOGLE_CLIENT_ID);
         JWT jwt;
         try {
@@ -451,6 +451,11 @@ public class OAuthService {
         Object emailVerified = payload.get("email_verified");
         if (emailVerified != null && !Boolean.TRUE.equals(emailVerified)) {
             throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 邮箱未验证");
+        }
+        // nonce 防重放：前端授权时生成的 nonce 应等于 id_token 内 nonce（只有传了 nonce 才校验）
+        String jwtNonce = payload.getStr("nonce");
+        if (StrUtil.isNotBlank(nonce) && !nonce.equals(jwtNonce)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 登录凭证校验失败");
         }
         Object kidObj = jwt.getHeader("kid");
         RSAPublicKey pub = kidObj == null ? null : jwksPublicKey(String.valueOf(kidObj));
