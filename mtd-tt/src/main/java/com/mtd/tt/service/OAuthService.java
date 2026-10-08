@@ -82,6 +82,10 @@ public class OAuthService {
     private static final String CFG_TELEGRAM_CLIENT_ID = "oauth.telegram.client_id";
     private static final String CFG_TELEGRAM_CLIENT_SECRET = "oauth.telegram.client_secret";
     private static final String CFG_TELEGRAM_REDIRECT_URI = "oauth.telegram.redirect_uri";
+    private static final String CFG_DISCORD_ENABLED = "oauth.discord.enabled";
+    private static final String CFG_DISCORD_CLIENT_ID = "oauth.discord.client_id";
+    private static final String CFG_DISCORD_CLIENT_SECRET = "oauth.discord.client_secret";
+    private static final String CFG_DISCORD_REDIRECT_URI = "oauth.discord.redirect_uri";
     private static final String CFG_PROXY_ENABLED = "oauth.proxy.enabled";
     private static final String CFG_PROXY_HOST = "oauth.proxy.host";
     private static final String CFG_PROXY_PORT = "oauth.proxy.port";
@@ -96,6 +100,10 @@ public class OAuthService {
     private static final String TELEGRAM_AUTHORIZE_URL = "https://oauth.telegram.org/auth";
     private static final String TELEGRAM_TOKEN_URL = "https://oauth.telegram.org/token";
     private static final String TELEGRAM_JWKS_URL = "https://oauth.telegram.org/.well-known/jwks.json";
+    private static final String DISCORD_AUTHORIZE_URL = "https://discord.com/oauth2/authorize";
+    private static final String DISCORD_TOKEN_URL = "https://discord.com/api/oauth2/token";
+    private static final String DISCORD_USER_URL = "https://discord.com/api/users/@me";
+    private static final String DISCORD_AVATAR_CDN = "https://cdn.discordapp.com/avatars/";
 
     @Autowired
     private SysConfigService configService;
@@ -306,8 +314,116 @@ public class OAuthService {
     }
 
     /**
-     * Telegram OIDC：用授权码换 id_token 并本地验签，解析用户 claims。
+     * Discord 登录前端配置：clientId + redirectUri（不泄露 secret）。
+     * Discord 仅支持授权码模式（纯 OAuth2，不提供 OpenID Connect / id_token）。
      */
+    public OAuthProviderItem discordConfig() {
+        OAuthProviderItem item = new OAuthProviderItem();
+        item.setProvider(OauthProviderEnum.DISCORD.getCode());
+        item.setName(OauthProviderEnum.DISCORD.getName());
+        item.setEnabled(configService.getBool(CFG_DISCORD_ENABLED, false));
+        item.setClientId(configService.get(CFG_DISCORD_CLIENT_ID));
+        item.setRedirectUri(configService.get(CFG_DISCORD_REDIRECT_URI));
+        item.setMode("code");
+        Long userId = LoginUtil.currentUserId();
+        if (userId != null) {
+            long cnt = bindingMapper.selectCountByQuery(
+                    QueryWrapper.create().eq(OauthBindingEntity::getUserId, userId)
+                            .eq(OauthBindingEntity::getProvider, OauthProviderEnum.DISCORD.getCode()));
+            item.setBound(cnt > 0);
+        }
+        return item;
+    }
+
+    /**
+     * Discord 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户。
+     * 仅授权码模式：用 client_secret 换 access_token，从 token 响应的 user 字段（或 /users/@me）取账号信息。
+     */
+    public OAuthCallbackResp discordCallback(String code, String redirectUri) {
+        if (StrUtil.isBlank(code)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码不能为空");
+        }
+        if (!configService.getBool(CFG_DISCORD_ENABLED, false)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Discord 登录未启用");
+        }
+        OAuthProviderUser info = exchangeDiscord(code, redirectUri);
+        if (StrUtil.isBlank(info.id())) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "获取 Discord 账号信息失败");
+        }
+        OAuthCallbackResp resp = new OAuthCallbackResp();
+        Long loginUserId = LoginUtil.currentUserId();
+        if (loginUserId == null) {
+            resp.setAction("login");
+            resp.setLogin(loginByProvider(OauthProviderEnum.DISCORD, info));
+        } else {
+            bindProvider(OauthProviderEnum.DISCORD, loginUserId, info);
+            resp.setAction("bound");
+            resp.setBindings(listBindings(loginUserId));
+        }
+        return resp;
+    }
+
+    /**
+     * Discord 授权码换 access_token 并取用户信息。
+     * Discord 不返回 id_token；token 响应在授权 scope 含 identify/email 时直接携带 user 字段，
+     * 缺失则回退调 /users/@me。头像为 CDN 地址（avatar hash 非空时）。
+     */
+    private OAuthProviderUser exchangeDiscord(String code, String redirectUri) {
+        String clientId = configService.get(CFG_DISCORD_CLIENT_ID);
+        String clientSecret = configService.get(CFG_DISCORD_CLIENT_SECRET);
+        if (StrUtil.isBlank(clientId) || StrUtil.isBlank(clientSecret)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Discord 登录未配置");
+        }
+        if (StrUtil.isBlank(redirectUri)) {
+            redirectUri = configService.get(CFG_DISCORD_REDIRECT_URI);
+        }
+        String tokenBody;
+        try {
+            tokenBody = applyProxy(HttpRequest.post(DISCORD_TOKEN_URL))
+                    .header("Accept", "application/json")
+                    .form("grant_type", "authorization_code")
+                    .form("code", code)
+                    .form("redirect_uri", StrUtil.blankToDefault(redirectUri, ""))
+                    .form("client_id", clientId)
+                    .form("client_secret", clientSecret)
+                    .timeout(15000)
+                    .execute().body();
+        } catch (Exception e) {
+            log.warn("Discord 换 token 失败: {}", e.getMessage());
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Discord 授权失败，请重试");
+        }
+        JSONObject tokenJson = JSONUtil.parseObj(tokenBody);
+        String accessToken = tokenJson.getStr("access_token");
+        if (StrUtil.isBlank(accessToken)) {
+            log.warn("Discord token 响应异常: {}", tokenBody);
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Discord 授权失败，请重试");
+        }
+        JSONObject u = tokenJson.getJSONObject("user");
+        if (u == null) {
+            try {
+                String userBody = applyProxy(HttpRequest.get(DISCORD_USER_URL))
+                        .header("Authorization", "Bearer " + accessToken)
+                        .timeout(15000)
+                        .execute().body();
+                u = JSONUtil.parseObj(userBody);
+            } catch (Exception e) {
+                throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "获取 Discord 账号信息失败");
+            }
+        }
+        if (u == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "获取 Discord 账号信息失败");
+        }
+        String id = String.valueOf(u.get("id"));
+        String email = u.getStr("email"); // Discord 邮箱可选且可能未验证
+        String avatarHash = u.getStr("avatar");
+        String avatar = StrUtil.isBlank(avatarHash) ? null
+                : DISCORD_AVATAR_CDN + id + "/" + avatarHash + ".png";
+        String name = StrUtil.blankToDefault(u.getStr("global_name"),
+                StrUtil.blankToDefault(u.getStr("username"), id));
+        return new OAuthProviderUser(id, email, name, avatar);
+    }
+
+    /** Telegram OIDC：用授权码换 id_token 并本地验签，解析用户 claims。 */
     private OAuthProviderUser exchangeTelegram(String code, String redirectUri, String codeVerifier) {
         String clientId = configService.get(CFG_TELEGRAM_CLIENT_ID);
         String clientSecret = configService.get(CFG_TELEGRAM_CLIENT_SECRET);
@@ -466,6 +582,11 @@ public class OAuthService {
                 item.setEnabled(configService.getBool(CFG_TELEGRAM_ENABLED, false));
                 item.setClientId(configService.get(CFG_TELEGRAM_CLIENT_ID));
                 item.setRedirectUri(configService.get(CFG_TELEGRAM_REDIRECT_URI));
+                item.setMode("code");
+            } else if (p == OauthProviderEnum.DISCORD) {
+                item.setEnabled(configService.getBool(CFG_DISCORD_ENABLED, false));
+                item.setClientId(configService.get(CFG_DISCORD_CLIENT_ID));
+                item.setRedirectUri(configService.get(CFG_DISCORD_REDIRECT_URI));
                 item.setMode("code");
             }
             item.setBound(binds.stream().anyMatch(b -> p.getCode().equals(b.getProvider())));

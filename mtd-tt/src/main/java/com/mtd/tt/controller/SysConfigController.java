@@ -57,6 +57,8 @@ public class SysConfigController {
             "oauth.github.client_secret", "oauth.github.redirect_uri",
             "oauth.telegram.enabled", "oauth.telegram.client_id",
             "oauth.telegram.client_secret", "oauth.telegram.redirect_uri",
+            "oauth.discord.enabled", "oauth.discord.client_id",
+            "oauth.discord.client_secret", "oauth.discord.redirect_uri",
             "oauth.proxy.enabled", "oauth.proxy.host", "oauth.proxy.port");
 
     @Operation(summary = "更新控制配置（仅管理员）")

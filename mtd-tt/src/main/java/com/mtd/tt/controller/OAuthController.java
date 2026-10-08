@@ -72,6 +72,18 @@ public class OAuthController {
         return Result.success(oauthService.telegramCallback(req.getCode(), req.getRedirectUri(), req.getCodeVerifier()));
     }
 
+    @Operation(summary = "Discord 登录前端配置（是否启用 + clientId + redirectUri）")
+    @PostMapping("/discord/config")
+    public Result<OAuthProviderItem> discordConfig() {
+        return Result.success(oauthService.discordConfig());
+    }
+
+    @Operation(summary = "Discord 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户")
+    @PostMapping("/discord/callback")
+    public Result<OAuthCallbackResp> discordCallback(@RequestBody OAuthCallbackReq req) {
+        return Result.success(oauthService.discordCallback(req.getCode(), req.getRedirectUri()));
+    }
+
     @Operation(summary = "当前用户三方绑定总览（需登录）")
     @PostMapping("/bindings")
     public Result<OAuthBindingsResp> bindings() {

@@ -12,7 +12,8 @@ public enum OauthProviderEnum {
 
     GOOGLE("google", "Google"),
     GITHUB("github", "GitHub"),
-    TELEGRAM("telegram", "Telegram");
+    TELEGRAM("telegram", "Telegram"),
+    DISCORD("discord", "Discord");
 
     private final String code;
     private final String name;

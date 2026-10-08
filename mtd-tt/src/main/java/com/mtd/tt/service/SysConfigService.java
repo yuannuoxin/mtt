@@ -81,6 +81,10 @@ public class SysConfigService {
                    ('oauth.telegram.client_id', '', 'Telegram OIDC Client ID（BotFather Login Widget 提供）'),
                    ('oauth.telegram.client_secret', '', 'Telegram OIDC Client Secret'),
                    ('oauth.telegram.redirect_uri', '', 'Telegram OIDC 回调地址（前端 /oauth/telegram/callback 完整 URL）'),
+                   ('oauth.discord.enabled', 'false', 'Discord 登录是否启用'),
+                   ('oauth.discord.client_id', '', 'Discord OAuth2 Client ID'),
+                   ('oauth.discord.client_secret', '', 'Discord OAuth2 Client Secret'),
+                   ('oauth.discord.redirect_uri', '', 'Discord OAuth2 回调地址（前端 /oauth/discord/callback 完整 URL）'),
                    ('oauth.proxy.enabled', 'false', 'Google API 请求是否走代理（本机无法直连时开启 true）'),
                    ('oauth.proxy.host', '', '代理主机，如 127.0.0.1'),
                    ('oauth.proxy.port', '', '代理端口，如 10808')
