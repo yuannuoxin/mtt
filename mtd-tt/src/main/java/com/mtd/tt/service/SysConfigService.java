@@ -72,6 +72,7 @@ public class SysConfigService {
                    ('oauth.google.client_id', '', 'Google OAuth Client ID'),
                    ('oauth.google.client_secret', '', 'Google OAuth Client Secret'),
                    ('oauth.google.redirect_uri', '', 'Google OAuth 回调地址（前端 /oauth/google/callback 完整 URL）'),
+                   ('oauth.google.mode', 'code', 'Google OAuth 模式：code=后端用code换token(需与Google交互/走代理)；id_token=前端隐式流拿id_token后端本地验签(不交互)'),
                    ('oauth.proxy.enabled', 'false', 'Google API 请求是否走代理（本机无法直连时开启 true）'),
                    ('oauth.proxy.host', '', '代理主机，如 127.0.0.1'),
                    ('oauth.proxy.port', '', '代理端口，如 10808')

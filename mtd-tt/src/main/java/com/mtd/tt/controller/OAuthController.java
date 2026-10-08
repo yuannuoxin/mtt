@@ -4,6 +4,7 @@ import com.mtd.common.core.exception.BusinessException;
 import com.mtd.common.core.result.Result;
 import com.mtd.common.core.result.ResultCode;
 import com.mtd.tt.model.req.OAuthCallbackReq;
+import com.mtd.tt.model.req.OAuthOidcReq;
 import com.mtd.tt.model.req.OAuthUnbindReq;
 import com.mtd.tt.model.resp.OAuthBindingsResp;
 import com.mtd.tt.model.resp.OAuthCallbackResp;
@@ -39,6 +40,12 @@ public class OAuthController {
     @PostMapping("/google/callback")
     public Result<OAuthCallbackResp> googleCallback(@RequestBody OAuthCallbackReq req) {
         return Result.success(oauthService.googleCallback(req.getCode(), req.getRedirectUri()));
+    }
+
+    @Operation(summary = "Google OIDC 登录（隐式流，后端本地验签 id_token，不跟 Google 交互）")
+    @PostMapping("/google/oidcLogin")
+    public Result<OAuthCallbackResp> googleOidcLogin(@RequestBody OAuthOidcReq req) {
+        return Result.success(oauthService.googleOidcLogin(req.getIdToken()));
     }
 
     @Operation(summary = "当前用户三方绑定总览（需登录）")

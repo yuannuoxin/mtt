@@ -18,4 +18,6 @@ public class OAuthProviderItem implements Serializable {
     /** 前端跳转 Google 授权页所需 */
     private String clientId;
     private String redirectUri;
+    /** OAuth 模式：code=后端换token(需交互)；id_token=前端隐式流拿id_token后端本地验签(不交互) */
+    private String mode;
 }

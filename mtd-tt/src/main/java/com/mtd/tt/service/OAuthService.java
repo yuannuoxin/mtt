@@ -5,8 +5,12 @@ import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.util.RandomUtil;
 import cn.hutool.core.util.StrUtil;
 import cn.hutool.http.HttpRequest;
+import cn.hutool.json.JSONArray;
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import cn.hutool.jwt.JWT;
+import cn.hutool.jwt.JWTUtil;
+import cn.hutool.jwt.signers.JWTSignerUtil;
 import com.mtd.common.core.exception.BusinessException;
 import com.mtd.common.core.result.ResultCode;
 import com.mtd.tt.enums.OauthProviderEnum;
@@ -31,9 +35,16 @@ import org.springframework.stereotype.Service;
 
 import jakarta.annotation.PostConstruct;
 
+import java.security.KeyFactory;
+import java.security.interfaces.RSAPublicKey;
+import java.security.spec.RSAPublicKeySpec;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.math.BigInteger;
 
 /**
  * 第三方登录（Google OAuth2.0 授权码流程）。
@@ -53,12 +64,14 @@ public class OAuthService {
     private static final String CFG_GOOGLE_CLIENT_ID = "oauth.google.client_id";
     private static final String CFG_GOOGLE_CLIENT_SECRET = "oauth.google.client_secret";
     private static final String CFG_GOOGLE_REDIRECT_URI = "oauth.google.redirect_uri";
+    private static final String CFG_GOOGLE_MODE = "oauth.google.mode";
     private static final String CFG_PROXY_ENABLED = "oauth.proxy.enabled";
     private static final String CFG_PROXY_HOST = "oauth.proxy.host";
     private static final String CFG_PROXY_PORT = "oauth.proxy.port";
 
     private static final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";
     private static final String GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v2/userinfo";
+    private static final String GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
 
     @Autowired
     private SysConfigService configService;
@@ -109,6 +122,7 @@ public class OAuthService {
         item.setEnabled(configService.getBool(CFG_GOOGLE_ENABLED, false));
         item.setClientId(configService.get(CFG_GOOGLE_CLIENT_ID));
         item.setRedirectUri(configService.get(CFG_GOOGLE_REDIRECT_URI));
+        item.setMode(StrUtil.blankToDefault(configService.get(CFG_GOOGLE_MODE), "code"));
         Long userId = LoginUtil.currentUserId();
         if (userId != null) {
             long cnt = bindingMapper.selectCountByQuery(
@@ -145,6 +159,30 @@ public class OAuthService {
     }
 
     /**
+     * Google OIDC 登录（隐式流，后端不跟 Google 交互）：
+     * 前端授权回调直接拿到 id_token（JWT），后端用 Google JWKS 公钥本地验签，
+     * 校验 iss/aud/exp/sub 后复用登录/绑定逻辑。适用于无法直连 Google API（换 token）的环境。
+     */
+    public OAuthCallbackResp googleOidcLogin(String idToken) {
+        if (StrUtil.isBlank(idToken)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Google 登录凭证不能为空");
+        }
+        ensureGoogleEnabled();
+        GoogleUserInfo info = verifyGoogleIdToken(idToken);
+        OAuthCallbackResp resp = new OAuthCallbackResp();
+        Long loginUserId = LoginUtil.currentUserId();
+        if (loginUserId == null) {
+            resp.setAction("login");
+            resp.setLogin(loginByGoogle(info));
+        } else {
+            bindGoogle(loginUserId, info);
+            resp.setAction("bound");
+            resp.setBindings(listBindings(loginUserId));
+        }
+        return resp;
+    }
+
+    /**
      * 当前用户三方绑定总览：系统支持的三方列表 + 已绑定明细
      */
     public OAuthBindingsResp bindings(Long userId) {
@@ -162,6 +200,7 @@ public class OAuthService {
                 item.setEnabled(configService.getBool(CFG_GOOGLE_ENABLED, false));
                 item.setClientId(configService.get(CFG_GOOGLE_CLIENT_ID));
                 item.setRedirectUri(configService.get(CFG_GOOGLE_REDIRECT_URI));
+                item.setMode(StrUtil.blankToDefault(configService.get(CFG_GOOGLE_MODE), "code"));
             }
             item.setBound(binds.stream().anyMatch(b -> p.getCode().equals(b.getProvider())));
             providers.add(item);
@@ -373,6 +412,108 @@ public class OAuthService {
     private void ensureGoogleEnabled() {
         if (!configService.getBool(CFG_GOOGLE_ENABLED, false)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Google 登录未启用");
+        }
+    }
+
+    // ---- OIDC id_token 本地验签（Google JWKS）----
+    private static final long JWKS_TTL_MS = 6 * 60 * 60 * 1000L;
+    private volatile Map<String, RSAPublicKey> jwksKeys = new HashMap<>();
+    private volatile long jwksFetchedAt = 0;
+
+    /**
+     * 本地校验 Google id_token：先看 iss/aud/exp/sub/email_verified，再用 JWKS 公钥验签。
+     */
+    private GoogleUserInfo verifyGoogleIdToken(String idToken) {
+        String clientId = configService.get(CFG_GOOGLE_CLIENT_ID);
+        JWT jwt;
+        try {
+            jwt = JWTUtil.parseToken(idToken);
+        } catch (Exception e) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 登录凭证无效");
+        }
+        JSONObject payload = jwt.getPayloads();
+        String iss = payload.getStr("iss");
+        String aud = payload.getStr("aud");
+        Long exp = payload.getLong("exp");
+        String sub = payload.getStr("sub");
+        if (!("https://accounts.google.com".equals(iss) || "accounts.google.com".equals(iss))) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 登录凭证无效");
+        }
+        if (StrUtil.isNotBlank(clientId) && !clientId.equals(aud)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 登录凭证无效");
+        }
+        if (exp == null || exp * 1000 <= System.currentTimeMillis() - 60_000) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 登录凭证已过期");
+        }
+        if (StrUtil.isBlank(sub)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 登录凭证无效");
+        }
+        Object emailVerified = payload.get("email_verified");
+        if (emailVerified != null && !Boolean.TRUE.equals(emailVerified)) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 邮箱未验证");
+        }
+        Object kidObj = jwt.getHeader("kid");
+        RSAPublicKey pub = kidObj == null ? null : jwksPublicKey(String.valueOf(kidObj));
+        if (pub == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 登录凭证校验失败");
+        }
+        try {
+            JWTUtil.verify(idToken, JWTSignerUtil.rs256(pub));
+        } catch (Exception e) {
+            log.warn("Google id_token 签名校验失败: {}", e.getMessage());
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "Google 登录凭证校验失败");
+        }
+        return new GoogleUserInfo(sub, payload.getStr("email"), payload.getStr("name"), payload.getStr("picture"));
+    }
+
+    /**
+     * 按 kid 取 Google JWKS 公钥，缓存 6 小时；缓存失效或未命中时重新拉取（走代理）。
+     */
+    private RSAPublicKey jwksPublicKey(String kid) {
+        if (StrUtil.isBlank(kid)) {
+            return null;
+        }
+        long now = System.currentTimeMillis();
+        if (jwksKeys.containsKey(kid) && now - jwksFetchedAt < JWKS_TTL_MS) {
+            return jwksKeys.get(kid);
+        }
+        synchronized (this) {
+            if (now - jwksFetchedAt > JWKS_TTL_MS || !jwksKeys.containsKey(kid)) {
+                fetchJwks();
+            }
+            return jwksKeys.get(kid);
+        }
+    }
+
+    private void fetchJwks() {
+        try {
+            String body = applyProxy(HttpRequest.get(GOOGLE_JWKS_URL)).timeout(15000).execute().body();
+            JSONObject json = JSONUtil.parseObj(body);
+            JSONArray keys = json.getJSONArray("keys");
+            Map<String, RSAPublicKey> m = new HashMap<>();
+            if (keys != null) {
+                for (int i = 0; i < keys.size(); i++) {
+                    JSONObject k = keys.getJSONObject(i);
+                    String kid = k.getStr("kid");
+                    String n = k.getStr("n");
+                    String e = k.getStr("e");
+                    if (kid == null || n == null || e == null) {
+                        continue;
+                    }
+                    try {
+                        byte[] nb = Base64.getUrlDecoder().decode(n);
+                        byte[] eb = Base64.getUrlDecoder().decode(e);
+                        RSAPublicKeySpec spec = new RSAPublicKeySpec(new BigInteger(1, nb), new BigInteger(1, eb));
+                        m.put(kid, (RSAPublicKey) KeyFactory.getInstance("RSA").generatePublic(spec));
+                    } catch (Exception ex) {
+                        log.warn("解析 Google JWK 失败: {}", ex.getMessage());
+                    }
+                }
+            }
+            jwksKeys = m;
+            jwksFetchedAt = System.currentTimeMillis();
+        } catch (Exception e) {
+            log.warn("拉取 Google JWKS 失败: {}", e.getMessage());
         }
     }
 
