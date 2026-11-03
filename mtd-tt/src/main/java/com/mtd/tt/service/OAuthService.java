@@ -651,6 +651,14 @@ public class OAuthService {
                 throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
                         "该" + provider.getName() + "账号已绑定其他账号");
             }
+            // 邮箱一致证明该三方账号属于该本地账号。若该本地账号已绑定同 provider，
+            // 直接登录即可，避免重复绑定触发 UNIQUE(user_id, provider) 约束冲突。
+            long sameProviderCount = bindingMapper.selectCountByQuery(
+                    QueryWrapper.create().eq(OauthBindingEntity::getUserId, byEmail.getId())
+                            .eq(OauthBindingEntity::getProvider, providerCode));
+            if (sameProviderCount > 0) {
+                return doLogin(byEmail);
+            }
             bind(provider, byEmail.getId(), info, null);
             return doLogin(byEmail);
         }
