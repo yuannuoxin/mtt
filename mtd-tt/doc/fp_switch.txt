@@ -1,0 +1,3 @@
+cfg_key	cfg_value	
+turnstile.enabled	true	
+email_code.enabled	true	

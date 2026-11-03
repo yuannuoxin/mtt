@@ -128,6 +128,8 @@ public class AuthService {
         user.setStatus(UserStatusEnum.ACTIVE.getCode());
         // 注册赠送初始积分
         user.setPoints((long) pointService.initialPoint());
+        // 浏览器指纹（可选，FingerprintJS v5 MIT 前端生成）
+        user.setFingerprint(req.getFingerprint());
         userMapper.insertSelective(user);
         pointService.grantRegisterPoints(user.getId());
 

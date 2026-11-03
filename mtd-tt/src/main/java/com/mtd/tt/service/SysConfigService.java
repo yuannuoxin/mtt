@@ -114,6 +114,8 @@ public class SysConfigService {
             // 经验与积分等级（users.exp / users.level，无 is 前缀字段）
             jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS exp BIGINT NOT NULL DEFAULT 0");
             jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS level INT NOT NULL DEFAULT 1");
+            // 浏览器指纹（注册时记录，无 is 前缀字段）
+            jdbcTemplate.execute("ALTER TABLE users ADD COLUMN IF NOT EXISTS fingerprint VARCHAR(128)");
             try {
                 jdbcTemplate.update("UPDATE users SET admin = COALESCE(is_admin, FALSE)");
                 jdbcTemplate.execute("ALTER TABLE users DROP COLUMN IF EXISTS is_admin");

@@ -29,4 +29,7 @@ public class RegisterReq extends BaseRequest {
 
     @Parameter(description = "Turnstile 人机校验 token（后端启用 Turnstile 时必填）")
     private String turnstileToken;
+
+    @Parameter(description = "浏览器指纹（FingerprintJS v5 MIT 前端生成）")
+    private String fingerprint;
 }

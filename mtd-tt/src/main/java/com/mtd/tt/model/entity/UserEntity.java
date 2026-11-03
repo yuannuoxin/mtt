@@ -66,4 +66,9 @@ public class UserEntity extends BaseEntity {
      * 积分等级（由经验挡位决定，默认 1）
      */
     private Integer level;
+
+    /**
+     * 浏览器指纹（注册时记录，FingerprintJS v5 MIT 前端生成）
+     */
+    private String fingerprint;
 }
