@@ -1,2 +1,0 @@
-id	username	fingerprint	
-38	fpr104800	visitor_FINAL_2026	
