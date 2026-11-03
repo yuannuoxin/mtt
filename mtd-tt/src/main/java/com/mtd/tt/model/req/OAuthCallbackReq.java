@@ -10,4 +10,7 @@ public class OAuthCallbackReq {
     private String nonce;
     /** OIDC PKCE：前端生成的 code_verifier，换 token 时回传（如 Telegram） */
     private String codeVerifier;
+
+    /** 浏览器指纹（FingerprintJS v5 MIT，三方登录注册新用户时记录） */
+    private String fingerprint;
 }

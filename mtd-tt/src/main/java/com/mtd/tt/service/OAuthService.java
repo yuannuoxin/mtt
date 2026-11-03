@@ -175,7 +175,7 @@ public class OAuthService {
     /**
      * Google 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户。
      */
-    public OAuthCallbackResp googleCallback(String code, String redirectUri, String nonce) {
+    public OAuthCallbackResp googleCallback(String code, String redirectUri, String nonce, String fingerprint) {
         if (StrUtil.isBlank(code)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码不能为空");
         }
@@ -188,7 +188,7 @@ public class OAuthService {
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
             resp.setAction("login");
-            resp.setLogin(loginByProvider(OauthProviderEnum.GOOGLE, toProviderUser(info)));
+            resp.setLogin(loginByProvider(OauthProviderEnum.GOOGLE, toProviderUser(info), fingerprint));
         } else {
             bindProvider(OauthProviderEnum.GOOGLE, loginUserId, toProviderUser(info));
             resp.setAction("bound");
@@ -202,7 +202,7 @@ public class OAuthService {
      * 前端授权回调直接拿到 id_token（JWT），后端用 Google JWKS 公钥本地验签，
      * 校验 iss/aud/exp/sub 后复用登录/绑定逻辑。适用于无法直连 Google API（换 token）的环境。
      */
-    public OAuthCallbackResp googleOidcLogin(String idToken, String nonce) {
+    public OAuthCallbackResp googleOidcLogin(String idToken, String nonce, String fingerprint) {
         if (StrUtil.isBlank(idToken)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "Google 登录凭证不能为空");
         }
@@ -212,7 +212,7 @@ public class OAuthService {
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
             resp.setAction("login");
-            resp.setLogin(loginByProvider(OauthProviderEnum.GOOGLE, info));
+            resp.setLogin(loginByProvider(OauthProviderEnum.GOOGLE, info, fingerprint));
         } else {
             bindProvider(OauthProviderEnum.GOOGLE, loginUserId, info);
             resp.setAction("bound");
@@ -246,7 +246,7 @@ public class OAuthService {
      * GitHub 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户。
      * GitHub 仅支持授权码模式（无用户 id_token），始终走 code 换 token。
      */
-    public OAuthCallbackResp githubCallback(String code, String redirectUri) {
+    public OAuthCallbackResp githubCallback(String code, String redirectUri, String fingerprint) {
         if (StrUtil.isBlank(code)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码不能为空");
         }
@@ -261,7 +261,7 @@ public class OAuthService {
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
             resp.setAction("login");
-            resp.setLogin(loginByProvider(OauthProviderEnum.GITHUB, info));
+            resp.setLogin(loginByProvider(OauthProviderEnum.GITHUB, info, fingerprint));
         } else {
             bindProvider(OauthProviderEnum.GITHUB, loginUserId, info);
             resp.setAction("bound");
@@ -296,7 +296,7 @@ public class OAuthService {
      * 用 client_id:client_secret Basic 认证换 id_token，本地 JWKS 验签（iss/aud/exp）。
      * Telegram 不返回邮箱，注册时用 {id}@telegram.local 占位邮箱。
      */
-    public OAuthCallbackResp telegramCallback(String code, String redirectUri, String codeVerifier) {
+    public OAuthCallbackResp telegramCallback(String code, String redirectUri, String codeVerifier, String fingerprint) {
         if (StrUtil.isBlank(code)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码不能为空");
         }
@@ -311,7 +311,7 @@ public class OAuthService {
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
             resp.setAction("login");
-            resp.setLogin(loginByProvider(OauthProviderEnum.TELEGRAM, info));
+            resp.setLogin(loginByProvider(OauthProviderEnum.TELEGRAM, info, fingerprint));
         } else {
             bindProvider(OauthProviderEnum.TELEGRAM, loginUserId, info);
             resp.setAction("bound");
@@ -346,7 +346,7 @@ public class OAuthService {
      * Discord 授权回调：未登录=登录/自动注册，已登录=绑定到当前用户。
      * 仅授权码模式：用 client_secret 换 access_token，从 token 响应的 user 字段（或 /users/@me）取账号信息。
      */
-    public OAuthCallbackResp discordCallback(String code, String redirectUri) {
+    public OAuthCallbackResp discordCallback(String code, String redirectUri, String fingerprint) {
         if (StrUtil.isBlank(code)) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "授权码不能为空");
         }
@@ -361,7 +361,7 @@ public class OAuthService {
         Long loginUserId = LoginUtil.currentUserId();
         if (loginUserId == null) {
             resp.setAction("login");
-            resp.setLogin(loginByProvider(OauthProviderEnum.DISCORD, info));
+            resp.setLogin(loginByProvider(OauthProviderEnum.DISCORD, info, fingerprint));
         } else {
             bindProvider(OauthProviderEnum.DISCORD, loginUserId, info);
             resp.setAction("bound");
@@ -632,7 +632,7 @@ public class OAuthService {
     /**
      * 登录/自动注册（未登录模式，provider 无关）
      */
-    private LoginResp loginByProvider(OauthProviderEnum provider, OAuthProviderUser info) {
+    private LoginResp loginByProvider(OauthProviderEnum provider, OAuthProviderUser info, String fingerprint) {
         String providerCode = provider.getCode();
         OauthBindingEntity bind = findByProviderUser(providerCode, info.id());
         if (bind != null) {
@@ -662,7 +662,7 @@ public class OAuthService {
             bind(provider, byEmail.getId(), info, null);
             return doLogin(byEmail);
         }
-        UserEntity user = registerByOAuth(provider, info);
+        UserEntity user = registerByOAuth(provider, info, fingerprint);
         bind(provider, user.getId(), info, null);
         return doLogin(user);
     }
@@ -706,7 +706,7 @@ public class OAuthService {
      * 用三方资料自动注册新用户（无密码，可后续设置；注册送积分）。
      * 无邮箱的三方（如 Telegram）用 {id}@{provider}.local 占位邮箱，保证账号体系一致。
      */
-    private UserEntity registerByOAuth(OauthProviderEnum provider, OAuthProviderUser info) {
+    private UserEntity registerByOAuth(OauthProviderEnum provider, OAuthProviderUser info, String fingerprint) {
         String email = info.email();
         if (StrUtil.isBlank(email)) {
             email = info.id() + "@" + provider.getCode() + ".local";
@@ -718,6 +718,7 @@ public class OAuthService {
         user.setPasswordHash(null);
         user.setStatus(UserStatusEnum.ACTIVE.getCode());
         user.setAvatar(info.avatar());
+        user.setFingerprint(fingerprint);
         user.setPoints((long) pointService.initialPoint());
         userMapper.insertSelective(user);
         pointService.grantRegisterPoints(user.getId());
