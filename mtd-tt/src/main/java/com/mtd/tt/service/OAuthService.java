@@ -117,6 +117,8 @@ public class OAuthService {
     private UserService userService;
     @Autowired
     private PointService pointService;
+    @Autowired
+    private LoginLogService loginLogService;
 
     @PostConstruct
     public void init() {
@@ -639,7 +641,7 @@ public class OAuthService {
             UserEntity user = userMapper.selectOneByQuery(
                     QueryWrapper.create().eq(UserEntity::getId, bind.getUserId()));
             checkCanLogin(user);
-            return doLogin(user);
+            return doLogin(user, providerCode, fingerprint);
         }
         // 未绑定：用三方邮箱查本地用户。邮箱一致即证明该三方账号属于该本地账号，自动绑定并直接登录。
         // 仅当该三方账号已被其他账号绑定时拒绝（防接管）。
@@ -657,14 +659,14 @@ public class OAuthService {
                     QueryWrapper.create().eq(OauthBindingEntity::getUserId, byEmail.getId())
                             .eq(OauthBindingEntity::getProvider, providerCode));
             if (sameProviderCount > 0) {
-                return doLogin(byEmail);
+                return doLogin(byEmail, providerCode, fingerprint);
             }
             bind(provider, byEmail.getId(), info, null);
-            return doLogin(byEmail);
+            return doLogin(byEmail, providerCode, fingerprint);
         }
         UserEntity user = registerByOAuth(provider, info, fingerprint);
         bind(provider, user.getId(), info, null);
-        return doLogin(user);
+        return doLogin(user, providerCode, fingerprint);
     }
 
     /**
@@ -1079,13 +1081,14 @@ public class OAuthService {
         return item;
     }
 
-    private LoginResp doLogin(UserEntity user) {
+    private LoginResp doLogin(UserEntity user, String provider, String fingerprint) {
         StpUtil.login(user.getId());
         SaTokenInfo tokenInfo = StpUtil.getTokenInfo();
         LoginResp resp = new LoginResp();
         resp.setTokenName(tokenInfo.getTokenName());
         resp.setTokenValue(tokenInfo.getTokenValue());
         resp.setUser(userService.getProfile(user.getId(), user.getId()));
+        loginLogService.record(user.getId(), provider, fingerprint);
         return resp;
     }
 

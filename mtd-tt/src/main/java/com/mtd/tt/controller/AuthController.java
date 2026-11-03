@@ -82,4 +82,11 @@ public class AuthController {
     public Result<UserProfileResp> userInfo() {
         return Result.success(authService.currentUserInfo());
     }
+
+    @Operation(summary = "当前用户登录记录（分页，含浏览器指纹/IP/UA）")
+    @PostMapping("/loginLogs")
+    public Result<com.mtd.common.core.response.PageResponse<com.mtd.tt.model.resp.LoginLogResp>> loginLogs(
+            @RequestBody(required = false) com.mtd.common.core.request.PageRequest page) {
+        return Result.success(authService.loginLogs(page));
+    }
 }

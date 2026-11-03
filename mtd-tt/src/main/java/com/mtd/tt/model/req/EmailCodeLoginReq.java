@@ -20,4 +20,7 @@ public class EmailCodeLoginReq extends BaseRequest {
 
     @Parameter(description = "Turnstile 人机校验 token（启用时必填）")
     private String turnstileToken;
+
+    @Parameter(description = "浏览器指纹（FingerprintJS v5 MIT，登录时记录）")
+    private String fingerprint;
 }

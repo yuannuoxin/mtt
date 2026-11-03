@@ -14,9 +14,13 @@ import com.mtd.tt.model.req.ForgotPasswordReq;
 import com.mtd.tt.model.req.PasswordLoginReq;
 import com.mtd.tt.model.req.RegisterReq;
 import com.mtd.tt.model.req.SendEmailCodeReq;
+import com.mtd.common.core.request.PageRequest;
+import com.mtd.common.core.response.PageResponse;
+import com.mtd.tt.model.resp.LoginLogResp;
 import com.mtd.tt.model.resp.LoginResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.UserStatusEnum;
+import com.mtd.tt.enums.LoginProviderEnum;
 import com.mtd.tt.util.FieldValidator;
 import com.mtd.tt.util.LoginUtil;
 import com.mybatisflex.core.query.QueryWrapper;
@@ -55,6 +59,9 @@ public class AuthService {
     @Autowired
     private SysConfigService sysConfigService;
 
+    @Autowired
+    private LoginLogService loginLogService;
+
     private static final String EMAIL_CODE_PREFIX = "tt:login:email:code:";
     private static final String EMAIL_CODE_FREQ_PREFIX = "tt:login:email:freq:";
     private static final long CODE_EXPIRE_MINUTES = 5;
@@ -76,7 +83,7 @@ public class AuthService {
         if (!BCrypt.checkpw(req.getPassword(), user.getPasswordHash())) {
             throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "账号或密码错误");
         }
-        return doLogin(user);
+        return doLogin(user, LoginProviderEnum.PASSWORD.getCode(), req.getFingerprint());
     }
 
     /**
@@ -133,7 +140,7 @@ public class AuthService {
         userMapper.insertSelective(user);
         pointService.grantRegisterPoints(user.getId());
 
-        return doLogin(user);
+        return doLogin(user, LoginProviderEnum.REGISTER.getCode(), req.getFingerprint());
     }
 
     /**
@@ -202,7 +209,7 @@ public class AuthService {
         UserEntity user = userMapper.selectOneByQuery(
                 QueryWrapper.create().eq(UserEntity::getEmail, req.getEmail()));
         checkCanLogin(user);
-        return doLogin(user);
+        return doLogin(user, LoginProviderEnum.EMAIL_CODE.getCode(), req.getFingerprint());
     }
 
     /**
@@ -249,13 +256,25 @@ public class AuthService {
         return userService.getProfile(userId, userId);
     }
 
-    private LoginResp doLogin(UserEntity user) {
+    /**
+     * 当前用户的登录记录（分页，按时间倒序）
+     */
+    public PageResponse<LoginLogResp> loginLogs(PageRequest page) {
+        Long userId = LoginUtil.currentUserId();
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "请先登录");
+        }
+        return loginLogService.records(userId, page == null ? new PageRequest() : page);
+    }
+
+    private LoginResp doLogin(UserEntity user, String provider, String fingerprint) {
         StpUtil.login(user.getId());
         SaTokenInfo tokenInfo = StpUtil.getTokenInfo();
         LoginResp resp = new LoginResp();
         resp.setTokenName(tokenInfo.getTokenName());
         resp.setTokenValue(tokenInfo.getTokenValue());
         resp.setUser(userService.getProfile(user.getId(), user.getId()));
+        loginLogService.record(user.getId(), provider, fingerprint);
         return resp;
     }
 
