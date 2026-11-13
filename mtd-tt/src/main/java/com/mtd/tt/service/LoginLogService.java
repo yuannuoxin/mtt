@@ -1,29 +1,41 @@
 package com.mtd.tt.service;
 
+import cn.dev33.satoken.session.SaSession;
+import cn.dev33.satoken.stp.StpUtil;
 import com.mtd.common.core.request.PageRequest;
 import com.mtd.common.core.response.PageResponse;
 import com.mtd.tt.enums.LoginProviderEnum;
 import com.mtd.tt.mapper.LoginLogMapper;
 import com.mtd.tt.model.entity.LoginLogEntity;
 import com.mtd.tt.model.resp.LoginLogResp;
+import com.mtd.tt.util.DeviceUtil;
 import jakarta.annotation.PostConstruct;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.time.OffsetDateTime;
 import java.util.List;
 
 /**
  * 登录日志：登录成功后记录来源方式、浏览器指纹、IP、UA，供用户端"登录记录"页查看当前/历史设备登录情况。
+ * 同时把本次登录的设备信息写入当前 token 会话，供"登录设备"页展示与远程下线。
  */
 @Slf4j
 @Service
 public class LoginLogService {
+
+    /** token 会话属性：设备名 */
+    public static final String SESSION_NAME = "dev:name";
+    /** token 会话属性：IP */
+    public static final String SESSION_IP = "dev:ip";
+    /** token 会话属性：UA */
+    public static final String SESSION_UA = "dev:ua";
+    /** token 会话属性：浏览器指纹 */
+    public static final String SESSION_FP = "dev:fp";
+    /** token 会话属性：登录方式 */
+    public static final String SESSION_PROVIDER = "dev:provider";
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
@@ -52,22 +64,37 @@ public class LoginLogService {
         }
     }
 
-    /** 记录一次登录（provider 如 password/email_code/google/github/telegram/discord） */
+    /**
+     * 记录一次登录（provider 如 password/email_code/google/github/telegram/discord），
+     * 并把设备信息写入当前 token 会话（调用时需已完成 StpUtil.login）。
+     */
     public void record(Long userId, String provider, String fingerprint) {
         if (userId == null) {
             return;
         }
+        String ip = DeviceUtil.clientIp();
+        String ua = DeviceUtil.userAgent();
         try {
             LoginLogEntity rec = new LoginLogEntity();
             rec.setUserId(userId);
             rec.setProvider(provider);
             rec.setFingerprint(fingerprint);
-            rec.setIp(clientIp());
-            rec.setUserAgent(userAgent());
+            rec.setIp(ip);
+            rec.setUserAgent(ua);
             rec.setCreatedAt(OffsetDateTime.now());
             loginLogMapper.insertSelective(rec);
         } catch (Exception e) {
             log.warn("记录登录日志失败 user={} provider={}: {}", userId, provider, e.getMessage());
+        }
+        try {
+            SaSession session = StpUtil.getTokenSession();
+            session.set(SESSION_NAME, DeviceUtil.deviceName(ua));
+            session.set(SESSION_IP, ip);
+            session.set(SESSION_UA, ua);
+            session.set(SESSION_FP, fingerprint);
+            session.set(SESSION_PROVIDER, provider);
+        } catch (Exception e) {
+            log.warn("写入设备会话信息失败 user={}: {}", userId, e.getMessage());
         }
     }
 
@@ -94,31 +121,5 @@ public class LoginLogService {
         r.setUserAgent(e.getUserAgent());
         r.setCreatedAt(e.getCreatedAt());
         return r;
-    }
-
-    private String clientIp() {
-        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs == null) {
-            return null;
-        }
-        HttpServletRequest req = attrs.getRequest();
-        String xff = req.getHeader("X-Forwarded-For");
-        if (xff != null && !xff.isBlank()) {
-            String first = xff.split(",")[0].trim();
-            return first.length() > 64 ? first.substring(0, 64) : first;
-        }
-        return req.getRemoteAddr();
-    }
-
-    private String userAgent() {
-        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
-        if (attrs == null) {
-            return null;
-        }
-        String ua = attrs.getRequest().getHeader("User-Agent");
-        if (ua == null || ua.isBlank()) {
-            return null;
-        }
-        return ua.length() > 255 ? ua.substring(0, 255) : ua;
     }
 }

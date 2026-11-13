@@ -1,15 +1,21 @@
 package com.mtd.tt.controller;
 
+import com.mtd.common.core.exception.BusinessException;
 import com.mtd.common.core.result.Result;
+import com.mtd.common.core.result.ResultCode;
 import com.mtd.tt.model.req.EmailCodeLoginReq;
 import com.mtd.tt.model.req.ForgotPasswordReq;
+import com.mtd.tt.model.req.KickDeviceReq;
 import com.mtd.tt.model.req.PasswordLoginReq;
 import com.mtd.tt.model.req.RegisterReq;
 import com.mtd.tt.model.req.SendEmailCodeReq;
+import com.mtd.tt.model.resp.DeviceResp;
 import com.mtd.tt.model.resp.LoginResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.service.AuthService;
+import com.mtd.tt.service.DeviceService;
 import com.mtd.tt.service.TurnstileService;
+import com.mtd.tt.util.LoginUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -31,6 +38,7 @@ public class AuthController {
 
     private final AuthService authService;
     private final TurnstileService turnstileService;
+    private final DeviceService deviceService;
 
     @Operation(summary = "账号密码登录")
     @PostMapping("/passwordLogin")
@@ -88,5 +96,32 @@ public class AuthController {
     public Result<com.mtd.common.core.response.PageResponse<com.mtd.tt.model.resp.LoginLogResp>> loginLogs(
             @RequestBody(required = false) com.mtd.common.core.request.PageRequest page) {
         return Result.success(authService.loginLogs(page));
+    }
+
+    @Operation(summary = "当前账号在线登录设备列表")
+    @PostMapping("/devices")
+    public Result<List<DeviceResp>> devices() {
+        return Result.success(deviceService.list(requireLogin()));
+    }
+
+    @Operation(summary = "下线指定登录设备")
+    @PostMapping("/kickDevice")
+    public Result<Map<String, Object>> kickDevice(@RequestBody KickDeviceReq req) {
+        boolean current = deviceService.kick(requireLogin(), req.getDeviceId());
+        return Result.success(Map.of("current", current));
+    }
+
+    @Operation(summary = "下线其他所有登录设备")
+    @PostMapping("/kickOtherDevices")
+    public Result<Map<String, Object>> kickOtherDevices() {
+        return Result.success(Map.of("count", deviceService.kickOthers(requireLogin())));
+    }
+
+    private Long requireLogin() {
+        Long userId = LoginUtil.currentUserId();
+        if (userId == null) {
+            throw new BusinessException(ResultCode.UNAUTHORIZED.getCode(), "请先登录");
+        }
+        return userId;
     }
 }
