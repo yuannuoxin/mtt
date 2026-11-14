@@ -36,6 +36,19 @@ minio:
   region: cn-east-1
   presign-expiry-seconds: 3600
 
+# 文件存储模式：minio（对象存储）| local（本机磁盘）
+# 运行期可用 sys_config 的 file.storage.type 覆盖（30 秒缓存内热生效）
+file:
+  storage:
+    type: local
+  local:
+    # 本地存储根目录，相对后端启动目录；也可写绝对路径
+    root: ./data/files
+    # 访问前缀，最终 URL = base-url + /files/{objectKey}
+    # 留空则返回相对路径 /files/{objectKey}，由前端代理或网关转发（推荐）
+    # 后端独立域名部署时填写，如 https://api.example.com
+    base-url: ""
+
 # Sa-Token 配置
 sa-token:
   # token 名称（同时也是 cookie 名称）

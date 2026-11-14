@@ -94,6 +94,8 @@ logs/
 .swo
 *~
 **/application-local.yml
+# 本地文件存储目录（file.storage.type=local 时上传的文件，不入库）
+mtd-tt/data/
 /tmp/
 /.idea/
 **/.flattened-pom.xml
