@@ -130,9 +130,9 @@ public class PostService {
             referenced = getActivePost(req.getReferencedPostId());
         }
 
-        // 引用/转发统一指向引用链最原始的推文：展示层永远拿到原始内容与原始作者，
-        // 不会出现「引用的引用」这种嵌套；同一原始推文一人只能引用（转发）一次。
-        if (typeEnum == PostTypeEnum.QUOTE || typeEnum == PostTypeEnum.REPOST) {
+        // 引用：按 Twitter 语义指向被引用这条推文本身，不回溯到最原始推文，也不限制次数；
+        // 转发：回溯到引用链最原始的推文，并且同一用户对同一原始推文只能转发一次。
+        if (typeEnum == PostTypeEnum.REPOST) {
             referenced = resolveQuoteRoot(referenced);
             Long rootId = referenced.getId();
             long dup = postMapper.selectCountByQuery(QueryWrapper.create()
@@ -141,10 +141,7 @@ public class PostService {
                     .isNull(PostEntity::getDeletedAt)
                     .eq(PostEntity::getReferencedPostId, rootId));
             if (dup > 0) {
-                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
-                        typeEnum == PostTypeEnum.QUOTE
-                                ? "你已经引用过这条推文了，取消引用后可以重新引用"
-                                : "你已经转发过这条推文了");
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "你已经转发过这条推文了");
             }
         }
 
@@ -154,7 +151,7 @@ public class PostService {
         post.setType(type);
         post.setContent(req.getContent());
         if (typeEnum == PostTypeEnum.QUOTE || typeEnum == PostTypeEnum.REPOST) {
-            // 引用/转发的目标已在上一步解析为原始推文，root 与 referenced 同指源头
+            // 引用的目标就是被引用那条推文；转发的目标已回溯为最原始推文。两者 root 与 referenced 同值
             post.setReferencedPostId(referenced.getId());
             post.setRootPostId(referenced.getId());
         } else {
