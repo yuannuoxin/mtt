@@ -53,7 +53,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -128,15 +130,39 @@ public class PostService {
             referenced = getActivePost(req.getReferencedPostId());
         }
 
+        // 引用/转发统一指向引用链最原始的推文：展示层永远拿到原始内容与原始作者，
+        // 不会出现「引用的引用」这种嵌套；同一原始推文一人只能引用（转发）一次。
+        if (typeEnum == PostTypeEnum.QUOTE || typeEnum == PostTypeEnum.REPOST) {
+            referenced = resolveQuoteRoot(referenced);
+            Long rootId = referenced.getId();
+            long dup = postMapper.selectCountByQuery(QueryWrapper.create()
+                    .eq(PostEntity::getUserId, currentUserId)
+                    .eq(PostEntity::getType, type)
+                    .isNull(PostEntity::getDeletedAt)
+                    .eq(PostEntity::getReferencedPostId, rootId));
+            if (dup > 0) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(),
+                        typeEnum == PostTypeEnum.QUOTE
+                                ? "你已经引用过这条推文了，取消引用后可以重新引用"
+                                : "你已经转发过这条推文了");
+            }
+        }
+
         // 组装帖子
         PostEntity post = new PostEntity();
         post.setUserId(currentUserId);
         post.setType(type);
         post.setContent(req.getContent());
-        post.setReferencedPostId(req.getReferencedPostId());
-        // reply：root_post_id 指向引用帖的根
-        if (typeEnum == PostTypeEnum.REPLY) {
-            post.setRootPostId(resolveRootId(referenced));
+        if (typeEnum == PostTypeEnum.QUOTE || typeEnum == PostTypeEnum.REPOST) {
+            // 引用/转发的目标已在上一步解析为原始推文，root 与 referenced 同指源头
+            post.setReferencedPostId(referenced.getId());
+            post.setRootPostId(referenced.getId());
+        } else {
+            post.setReferencedPostId(req.getReferencedPostId());
+            // reply：root_post_id 指向引用帖的根
+            if (typeEnum == PostTypeEnum.REPLY) {
+                post.setRootPostId(resolveRootId(referenced));
+            }
         }
         post.setVisibility(StrUtil.blankToDefault(req.getVisibility(), PostVisibilityEnum.PUBLIC.getCode()));
         post.setArticleFlag(0);
@@ -405,6 +431,13 @@ public class PostService {
         }
         post.setDeletedAt(OffsetDateTime.now());
         postMapper.update(post);
+        // 取消引用/取消转发 = 删除这条推文：把被引用原帖的转发计数与"已转发"关系同步减回去
+        if ((PostTypeEnum.QUOTE.getCode().equals(post.getType())
+                || PostTypeEnum.REPOST.getCode().equals(post.getType()))
+                && post.getReferencedPostId() != null) {
+            Long rootId = post.getRootPostId() != null ? post.getRootPostId() : post.getReferencedPostId();
+            redisCounter.removeUser(rootId, RedisPostCounter.REPOST, currentUserId);
+        }
         // 从所有时间线里移除该帖
         timelineService.clearOnPostDeleted(postId);
     }
@@ -773,10 +806,11 @@ public class PostService {
             resp.setReposted(false);
         }
 
-        // 被引用/被回复的原文帖子（reply/quote/repost 时返回，限制一层避免深层递归）
+        // 被引用/被回复的原文帖子（reply/quote/repost 时返回，限制一层避免深层递归；
+        // 因为 quote/repost 落库时已指向原始推文，一层就够，不会出现「引用的引用」）
         if (depth < 1 && post.getReferencedPostId() != null) {
             PostEntity ref = postMapper.selectOneById(post.getReferencedPostId());
-            if (ref != null) {
+            if (ref != null && ref.getDeletedAt() == null) {
                 resp.setReferencedPost(buildPostResp(ref, currentUserId, depth + 1));
             }
         }
@@ -859,6 +893,34 @@ public class PostService {
 
     private Long resolveRootId(PostEntity referenced) {
         return referenced.getRootPostId() != null ? referenced.getRootPostId() : referenced.getId();
+    }
+
+    /**
+     * 把被引用帖回溯到引用链最源头的那条推文。
+     * quote / repost 自身没有独立正文，展示时只能看源头，所以沿 referenced 链一路回溯
+     * （深度上限 10、seen 防环）；引用普通推文或回复时返回其自身。
+     */
+    private PostEntity resolveQuoteRoot(PostEntity start) {
+        PostEntity cur = start;
+        Set<Long> seen = new HashSet<>();
+        seen.add(cur.getId());
+        for (int i = 0; i < 10; i++) {
+            String t = cur.getType();
+            if (!PostTypeEnum.QUOTE.getCode().equals(t) && !PostTypeEnum.REPOST.getCode().equals(t)) {
+                return cur;
+            }
+            Long nextId = cur.getReferencedPostId();
+            if (nextId == null || nextId <= 0 || seen.contains(nextId)) {
+                return cur;
+            }
+            PostEntity next = postMapper.selectOneById(nextId);
+            if (next == null || next.getDeletedAt() != null) {
+                return cur;
+            }
+            seen.add(nextId);
+            cur = next;
+        }
+        return cur;
     }
 
     private void notify(Long receiverUserId, Long triggerUserId, String type, Long postId) {
