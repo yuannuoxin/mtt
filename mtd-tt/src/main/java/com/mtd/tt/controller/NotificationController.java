@@ -40,6 +40,13 @@ public class NotificationController {
         return Result.success();
     }
 
+    @Operation(summary = "单条标记已读")
+    @PostMapping("/read")
+    public Result<Void> read(@RequestBody Map<String, Long> body) {
+        notificationService.markRead(LoginUtil.currentUserId(), body.get("id"));
+        return Result.success();
+    }
+
     @Operation(summary = "未读通知数量")
     @PostMapping("/unreadCount")
     public Result<Map<String, Long>> unreadCount() {

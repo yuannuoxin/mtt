@@ -86,6 +86,25 @@ public class NotificationService {
     }
 
     /**
+     * 单条标记已读（点击通知时调用）：只允许操作接收者本人的通知
+     */
+    public void markRead(Long currentUserId, Long id) {
+        if (currentUserId == null || id == null || id <= 0) {
+            return;
+        }
+        NotificationEntity entity = notificationMapper.selectOneByQuery(
+                QueryWrapper.create()
+                        .eq(NotificationEntity::getId, id)
+                        .eq(NotificationEntity::getReceiverUserId, currentUserId)
+                        .eq(NotificationEntity::getRead, false));
+        if (entity == null) {
+            return;
+        }
+        entity.setRead(true);
+        notificationMapper.update(entity);
+    }
+
+    /**
      * 未读通知数量
      */
     public long unreadCount(Long currentUserId) {
