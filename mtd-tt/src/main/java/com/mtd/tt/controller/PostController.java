@@ -7,8 +7,10 @@ import com.mtd.tt.model.req.HomeTimelineReq;
 import com.mtd.tt.model.req.PostIdReq;
 import com.mtd.tt.model.req.PostRepliesReq;
 import com.mtd.tt.model.req.SearchPostReq;
+import com.mtd.tt.model.req.ThreadReq;
 import com.mtd.tt.model.req.UserPostsReq;
 import com.mtd.tt.model.resp.PostResp;
+import com.mtd.tt.model.resp.ThreadResp;
 import com.mtd.tt.service.PostService;
 import com.mtd.tt.util.LoginUtil;
 import io.swagger.v3.oas.annotations.Operation;
@@ -71,6 +73,12 @@ public class PostController {
     @PostMapping("/replies")
     public Result<PageResponse<PostResp>> replies(@RequestBody PostRepliesReq req) {
         return Result.success(postService.replies(req.getPostId(), LoginUtil.currentUserId(), req));
+    }
+
+    @Operation(summary = "详情页对话视图（上文链 + 直接回复）")
+    @PostMapping("/thread")
+    public Result<ThreadResp> thread(@RequestBody ThreadReq req) {
+        return Result.success(postService.thread(req, LoginUtil.currentUserId()));
     }
 
     @Operation(summary = "搜索帖子")

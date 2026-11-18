@@ -29,10 +29,12 @@ import com.mtd.tt.model.req.CreatePostLinkCardReq;
 import com.mtd.tt.model.req.CreatePostMediaReq;
 import com.mtd.tt.model.req.CreatePostMentionReq;
 import com.mtd.tt.model.req.CreatePostReq;
+import com.mtd.tt.model.req.ThreadReq;
 import com.mtd.tt.model.resp.PostLinkCardResp;
 import com.mtd.tt.model.resp.PostMediaResp;
 import com.mtd.tt.model.resp.PostMentionResp;
 import com.mtd.tt.model.resp.PostResp;
+import com.mtd.tt.model.resp.ThreadResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.CardTypeEnum;
 import com.mtd.tt.enums.HotScoreWeightEnum;
@@ -53,6 +55,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -574,6 +578,80 @@ public class PostService {
                 .filter(ObjectUtil::isNotNull)
                 .collect(Collectors.toList());
         return PageResponse.of((int) p.getPageNumber(), (int) p.getPageSize(), p.getTotalRow(), list);
+    }
+
+    /**
+     * 详情页对话视图（推特式）：当前帖 + 上文链 + 直接回复（带 childReplyCount）。
+     * <p>上文链只沿 reply 的 referencedPostId 上溯；引用/转发用引用卡表达，不展开成上下文。
+     * 直接回复按 id 升序、afterId 游标分页；更深层由前端按 childReplyCount 懒加载。
+     */
+    public ThreadResp thread(ThreadReq req, Long currentUserId) {
+        PostEntity post = getActivePost(req.getPostId());
+        int pageSize = req.getPageSize() == null || req.getPageSize() <= 0 ? 20 : Math.min(req.getPageSize(), 100);
+
+        QueryWrapper wrapper = QueryWrapper.create()
+                .eq(PostEntity::getReferencedPostId, post.getId())
+                .eq(PostEntity::getType, PostTypeEnum.REPLY.getCode())
+                .isNull(PostEntity::getDeletedAt);
+        if (req.getAfterId() != null && req.getAfterId() > 0) {
+            wrapper.gt(PostEntity::getId, req.getAfterId());
+        }
+        wrapper.orderBy(PostEntity::getId, true).limit(pageSize + 1);
+        List<PostEntity> rows = postMapper.selectListByQuery(wrapper);
+        boolean hasMore = rows.size() > pageSize;
+        if (hasMore) {
+            rows = rows.subList(0, pageSize);
+        }
+
+        List<PostResp> children = new ArrayList<>();
+        for (PostEntity p : rows) {
+            try {
+                checkViewPermission(p, currentUserId);
+            } catch (BusinessException e) {
+                continue;
+            }
+            PostResp childResp = buildPostResp(p, currentUserId);
+            childResp.setChildReplyCount(postMapper.selectCountByQuery(QueryWrapper.create()
+                    .eq(PostEntity::getReferencedPostId, p.getId())
+                    .eq(PostEntity::getType, PostTypeEnum.REPLY.getCode())
+                    .isNull(PostEntity::getDeletedAt)));
+            children.add(childResp);
+        }
+
+        ThreadResp resp = new ThreadResp();
+        resp.setPost(buildPostResp(post, currentUserId));
+        resp.setAncestors(ancestors(post, currentUserId));
+        resp.setChildren(children);
+        resp.setHasMore(hasMore);
+        resp.setNextCursor(children.isEmpty() ? 0L : children.get(children.size() - 1).getId());
+        return resp;
+    }
+
+    /**
+     * 上文链：从当前帖沿 reply 的 referencedPostId 上溯，返回 root → parent 顺序（深度上限 10、防环）
+     */
+    private List<PostResp> ancestors(PostEntity post, Long currentUserId) {
+        List<PostEntity> chain = new ArrayList<>();
+        Set<Long> seen = new HashSet<>();
+        PostEntity cur = post;
+        for (int i = 0; i < 10; i++) {
+            if (!PostTypeEnum.REPLY.getCode().equals(cur.getType()) || cur.getReferencedPostId() == null) {
+                break;
+            }
+            Long pid = cur.getReferencedPostId();
+            if (seen.contains(pid)) {
+                break;
+            }
+            seen.add(pid);
+            PostEntity parent = postMapper.selectOneById(pid);
+            if (parent == null || parent.getDeletedAt() != null) {
+                break;
+            }
+            chain.add(parent);
+            cur = parent;
+        }
+        Collections.reverse(chain);
+        return chain.stream().map(p -> buildPostResp(p, currentUserId)).collect(Collectors.toList());
     }
 
     /**

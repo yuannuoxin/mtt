@@ -97,4 +97,7 @@ public class PostResp implements Serializable {
 
     @Parameter(description = "是否是当前登录用户发布的")
     private Boolean mine;
+
+    @Parameter(description = "直接子回复数（线程视图显示「查看 N 条回复」）")
+    private Long childReplyCount;
 }
