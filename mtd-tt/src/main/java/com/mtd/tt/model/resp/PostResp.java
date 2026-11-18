@@ -100,4 +100,7 @@ public class PostResp implements Serializable {
 
     @Parameter(description = "直接子回复数（线程视图显示「查看 N 条回复」）")
     private Long childReplyCount;
+
+    @Parameter(description = "这条回复回复的是谁（父帖作者用户名），平铺回复显示「回复 @xxx」")
+    private String replyToUsername;
 }

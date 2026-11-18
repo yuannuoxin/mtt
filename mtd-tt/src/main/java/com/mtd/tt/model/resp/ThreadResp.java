@@ -18,8 +18,8 @@ public class ThreadResp implements Serializable {
     @Parameter(description = "上文链，按 root → parent 顺序；当前帖不是回复时为空")
     private List<PostResp> ancestors;
 
-    @Parameter(description = "直接回复，按 id 升序")
-    private List<PostResp> children;
+    @Parameter(description = "整条对话的回复，平铺、按 id 升序（不含当前帖与上方祖先）")
+    private List<PostResp> replies;
 
     @Parameter(description = "是否还有更多直接回复")
     private Boolean hasMore;

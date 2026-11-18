@@ -581,18 +581,29 @@ public class PostService {
     }
 
     /**
-     * 详情页对话视图（推特式）：当前帖 + 上文链 + 直接回复（带 childReplyCount）。
+     * 详情页对话视图（推特式）：当前帖 + 上文链 + 整条对话的回复（平铺、升序）。
      * <p>上文链只沿 reply 的 referencedPostId 上溯；引用/转发用引用卡表达，不展开成上下文。
-     * 直接回复按 id 升序、afterId 游标分页；更深层由前端按 childReplyCount 懒加载。
+     * 回复以对话根（root_post_id）为范围平铺，按 id 升序、afterId 游标分页；排除当前帖和上方祖先，避免重复。
      */
     public ThreadResp thread(ThreadReq req, Long currentUserId) {
         PostEntity post = getActivePost(req.getPostId());
         int pageSize = req.getPageSize() == null || req.getPageSize() <= 0 ? 20 : Math.min(req.getPageSize(), 100);
 
+        List<PostResp> ancestorResps = ancestors(post, currentUserId);
+
+        // 对话根：reply/repost 取 rootPostId，original/quote 自身即根
+        Long rootId = post.getRootPostId() != null && post.getRootPostId() > 0 ? post.getRootPostId() : post.getId();
+        List<Long> exclude = new ArrayList<>();
+        exclude.add(post.getId());
+        for (PostResp a : ancestorResps) {
+            exclude.add(a.getId());
+        }
+
         QueryWrapper wrapper = QueryWrapper.create()
-                .eq(PostEntity::getReferencedPostId, post.getId())
                 .eq(PostEntity::getType, PostTypeEnum.REPLY.getCode())
-                .isNull(PostEntity::getDeletedAt);
+                .eq(PostEntity::getRootPostId, rootId)
+                .isNull(PostEntity::getDeletedAt)
+                .notIn(PostEntity::getId, exclude);
         if (req.getAfterId() != null && req.getAfterId() > 0) {
             wrapper.gt(PostEntity::getId, req.getAfterId());
         }
@@ -603,28 +614,57 @@ public class PostService {
             rows = rows.subList(0, pageSize);
         }
 
-        List<PostResp> children = new ArrayList<>();
+        List<PostResp> replies = new ArrayList<>();
         for (PostEntity p : rows) {
             try {
                 checkViewPermission(p, currentUserId);
             } catch (BusinessException e) {
                 continue;
             }
-            PostResp childResp = buildPostResp(p, currentUserId);
-            childResp.setChildReplyCount(postMapper.selectCountByQuery(QueryWrapper.create()
-                    .eq(PostEntity::getReferencedPostId, p.getId())
-                    .eq(PostEntity::getType, PostTypeEnum.REPLY.getCode())
-                    .isNull(PostEntity::getDeletedAt)));
-            children.add(childResp);
+            replies.add(buildPostResp(p, currentUserId));
         }
+        fillReplyToUsernames(replies);
 
         ThreadResp resp = new ThreadResp();
         resp.setPost(buildPostResp(post, currentUserId));
-        resp.setAncestors(ancestors(post, currentUserId));
-        resp.setChildren(children);
+        resp.setAncestors(ancestorResps);
+        resp.setReplies(replies);
         resp.setHasMore(hasMore);
-        resp.setNextCursor(children.isEmpty() ? 0L : children.get(children.size() - 1).getId());
+        resp.setNextCursor(replies.isEmpty() ? 0L : replies.get(replies.size() - 1).getId());
         return resp;
+    }
+
+    /**
+     * 给平铺回复补上「回复给谁」：父帖作者的 username（批量查父帖与用户，避免 N+1）
+     */
+    private void fillReplyToUsernames(List<PostResp> replies) {
+        List<Long> parentIds = replies.stream()
+                .map(PostResp::getReferencedPostId)
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+        if (parentIds.isEmpty()) {
+            return;
+        }
+        QueryWrapper parentWrapper = QueryWrapper.create()
+                .in(PostEntity::getId, parentIds)
+                .select(PostEntity::getId, PostEntity::getUserId);
+        List<PostEntity> parents = postMapper.selectListByQuery(parentWrapper);
+        List<Long> userIds = parents.stream().map(PostEntity::getUserId).distinct().collect(Collectors.toList());
+        QueryWrapper userWrapper = QueryWrapper.create()
+                .in(UserEntity::getId, userIds)
+                .select(UserEntity::getId, UserEntity::getUsername);
+        List<UserEntity> users = userMapper.selectListByQuery(userWrapper);
+        java.util.Map<Long, Long> parentUser = parents.stream()
+                .collect(Collectors.toMap(PostEntity::getId, PostEntity::getUserId, (a, b) -> a));
+        java.util.Map<Long, String> userNames = users.stream()
+                .collect(Collectors.toMap(UserEntity::getId, UserEntity::getUsername, (a, b) -> a));
+        for (PostResp r : replies) {
+            Long parentUserId = r.getReferencedPostId() == null ? null : parentUser.get(r.getReferencedPostId());
+            if (parentUserId != null) {
+                r.setReplyToUsername(userNames.get(parentUserId));
+            }
+        }
     }
 
     /**
