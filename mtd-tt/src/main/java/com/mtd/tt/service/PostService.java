@@ -131,9 +131,10 @@ public class PostService {
         }
 
         // 引用：按 Twitter 语义指向被引用这条推文本身，不回溯到最原始推文，也不限制次数；
-        // 转发：回溯到引用链最原始的推文，并且同一用户对同一原始推文只能转发一次。
+        // 转发：只沿 repost 链归一（转推不能层层叠加），但不穿 quote——转推一条引用帖时目标就是那条引用帖；
+        // 同一用户对同一转推目标只能转发一次。
         if (typeEnum == PostTypeEnum.REPOST) {
-            referenced = resolveQuoteRoot(referenced);
+            referenced = resolveRepostRoot(referenced);
             Long rootId = referenced.getId();
             long dup = postMapper.selectCountByQuery(QueryWrapper.create()
                     .eq(PostEntity::getUserId, currentUserId)
@@ -151,9 +152,12 @@ public class PostService {
         post.setType(type);
         post.setContent(req.getContent());
         if (typeEnum == PostTypeEnum.QUOTE || typeEnum == PostTypeEnum.REPOST) {
-            // 引用的目标就是被引用那条推文；转发的目标已回溯为最原始推文。两者 root 与 referenced 同值
+            // 引用：目标就是被引用那条推文；引用帖是一条独立推文，自己就是对话根，root 留空。
+            // 转发：目标已归一化为被转推的推文（不穿 quote），root 与 referenced 同值。
             post.setReferencedPostId(referenced.getId());
-            post.setRootPostId(referenced.getId());
+            if (typeEnum == PostTypeEnum.REPOST) {
+                post.setRootPostId(referenced.getId());
+            }
         } else {
             post.setReferencedPostId(req.getReferencedPostId());
             // reply：root_post_id 指向引用帖的根
@@ -803,9 +807,10 @@ public class PostService {
             resp.setReposted(false);
         }
 
-        // 被引用/被回复的原文帖子（reply/quote/repost 时返回，限制一层避免深层递归；
-        // 因为 quote/repost 落库时已指向原始推文，一层就够，不会出现「引用的引用」）
-        if (depth < 1 && post.getReferencedPostId() != null) {
+        // 被引用/被回复的原文帖子：最多两层。
+        // 转推一条引用帖时，第一层是被转推的那条 quote，第二层才是它引用的原推；
+        // 两层之后不再往下取（depth >= 2 停止），避免深层递归。
+        if (depth < 2 && post.getReferencedPostId() != null) {
             PostEntity ref = postMapper.selectOneById(post.getReferencedPostId());
             if (ref != null && ref.getDeletedAt() == null) {
                 resp.setReferencedPost(buildPostResp(ref, currentUserId, depth + 1));
@@ -893,17 +898,17 @@ public class PostService {
     }
 
     /**
-     * 把被引用帖回溯到引用链最源头的那条推文。
-     * quote / repost 自身没有独立正文，展示时只能看源头，所以沿 referenced 链一路回溯
-     * （深度上限 10、seen 防环）；引用普通推文或回复时返回其自身。
+     * 把被转推的推文归一化为“那条被转推的推文”（推特不允许转推的转推）。
+     * 只沿 repost 链回溯：遇到 quote / original / reply 立即停在它自身——
+     * 引用帖是一条独立推文，转推它时目标就是这条引用帖，不往上穿到它引用的原推。
+     * 深度上限 10、seen 防环。
      */
-    private PostEntity resolveQuoteRoot(PostEntity start) {
+    private PostEntity resolveRepostRoot(PostEntity start) {
         PostEntity cur = start;
         Set<Long> seen = new HashSet<>();
         seen.add(cur.getId());
         for (int i = 0; i < 10; i++) {
-            String t = cur.getType();
-            if (!PostTypeEnum.QUOTE.getCode().equals(t) && !PostTypeEnum.REPOST.getCode().equals(t)) {
+            if (!PostTypeEnum.REPOST.getCode().equals(cur.getType())) {
                 return cur;
             }
             Long nextId = cur.getReferencedPostId();
