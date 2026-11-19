@@ -9,7 +9,9 @@ import com.mtd.tt.model.req.PostRepliesReq;
 import com.mtd.tt.model.req.SearchPostReq;
 import com.mtd.tt.model.req.ThreadReq;
 import com.mtd.tt.model.req.UserPostsReq;
+import com.mtd.tt.model.req.RelationReq;
 import com.mtd.tt.model.resp.PostResp;
+import com.mtd.tt.model.resp.RelationResp;
 import com.mtd.tt.model.resp.ThreadResp;
 import com.mtd.tt.service.PostService;
 import com.mtd.tt.util.LoginUtil;
@@ -79,6 +81,13 @@ public class PostController {
     @PostMapping("/thread")
     public Result<ThreadResp> thread(@RequestBody ThreadReq req) {
         return Result.success(postService.thread(req, LoginUtil.currentUserId()));
+    }
+
+    @Operation(summary = "引用 / 转推列表")
+    @PostMapping("/relations")
+    public Result<RelationResp> relations(@RequestBody RelationReq req) {
+        return Result.success(postService.relations(req.getPostId(), req.getType(), req.getSort(),
+                req.getPageNum(), req.getPageSize(), LoginUtil.currentUserId()));
     }
 
     @Operation(summary = "搜索帖子")

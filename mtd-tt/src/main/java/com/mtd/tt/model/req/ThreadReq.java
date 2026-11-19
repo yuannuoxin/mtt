@@ -7,7 +7,7 @@ import lombok.Data;
 import java.io.Serializable;
 
 /**
- * 详情页对话视图请求：当前帖 + 上文链 + 直接回复（afterId 为直接回复的升序游标）
+ * 详情页对话视图请求：当前帖 + 上文链 + 整条对话的平铺回复
  */
 @Data
 public class ThreadReq implements Serializable {
@@ -16,8 +16,11 @@ public class ThreadReq implements Serializable {
     @Parameter(description = "帖子ID")
     private Long postId;
 
-    @Parameter(description = "游标：只取 id 大于该值的直接回复（首页传 0 或不传）")
-    private Long afterId;
+    @Parameter(description = "回复排序：relevant（最相关，默认）| latest（最新）| liked（最多点赞）")
+    private String sort;
+
+    @Parameter(description = "页码，从 1 开始")
+    private Integer pageNum;
 
     @Parameter(description = "每页条数，默认 20")
     private Integer pageSize;

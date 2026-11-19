@@ -34,6 +34,7 @@ import com.mtd.tt.model.resp.PostLinkCardResp;
 import com.mtd.tt.model.resp.PostMediaResp;
 import com.mtd.tt.model.resp.PostMentionResp;
 import com.mtd.tt.model.resp.PostResp;
+import com.mtd.tt.model.resp.RelationResp;
 import com.mtd.tt.model.resp.ThreadResp;
 import com.mtd.tt.model.resp.UserProfileResp;
 import com.mtd.tt.enums.CardTypeEnum;
@@ -581,13 +582,14 @@ public class PostService {
     }
 
     /**
-     * 详情页对话视图（推特式）：当前帖 + 上文链 + 整条对话的回复（平铺、升序）。
+     * 详情页对话视图（推特式）：当前帖 + 上文链 + 整条对话的回复（平铺，可按 最相关/最新/最多点赞 排序）。
      * <p>上文链只沿 reply 的 referencedPostId 上溯；引用/转发用引用卡表达，不展开成上下文。
-     * 回复以对话根（root_post_id）为范围平铺，按 id 升序、afterId 游标分页；排除当前帖和上方祖先，避免重复。
+     * 回复以对话根（root_post_id）为范围平铺，pageNum 分页；排除当前帖和上方祖先，避免重复。
      */
     public ThreadResp thread(ThreadReq req, Long currentUserId) {
         PostEntity post = getActivePost(req.getPostId());
         int pageSize = req.getPageSize() == null || req.getPageSize() <= 0 ? 20 : Math.min(req.getPageSize(), 100);
+        int pageNum = req.getPageNum() == null || req.getPageNum() <= 0 ? 1 : req.getPageNum();
 
         List<PostResp> ancestorResps = ancestors(post, currentUserId);
 
@@ -599,15 +601,20 @@ public class PostService {
             exclude.add(a.getId());
         }
 
+        QueryWrapper countWrapper = QueryWrapper.create()
+                .eq(PostEntity::getType, PostTypeEnum.REPLY.getCode())
+                .eq(PostEntity::getRootPostId, rootId)
+                .isNull(PostEntity::getDeletedAt)
+                .notIn(PostEntity::getId, exclude);
+        Long total = postMapper.selectCountByQuery(countWrapper);
+
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq(PostEntity::getType, PostTypeEnum.REPLY.getCode())
                 .eq(PostEntity::getRootPostId, rootId)
                 .isNull(PostEntity::getDeletedAt)
                 .notIn(PostEntity::getId, exclude);
-        if (req.getAfterId() != null && req.getAfterId() > 0) {
-            wrapper.gt(PostEntity::getId, req.getAfterId());
-        }
-        wrapper.orderBy(PostEntity::getId, true).limit(pageSize + 1);
+        applySort(wrapper, req.getSort(), false);
+        wrapper.offset((pageNum - 1) * pageSize).limit(pageSize + 1);
         List<PostEntity> rows = postMapper.selectListByQuery(wrapper);
         boolean hasMore = rows.size() > pageSize;
         if (hasMore) {
@@ -625,12 +632,93 @@ public class PostService {
         }
         fillReplyToUsernames(replies);
 
+        // 引用数、转推数都按实际关系记录统计（帖子自带的 repostCount 是热度累计，可能包含已删的）
+        Long quoteCount = postMapper.selectCountByQuery(QueryWrapper.create()
+                .eq(PostEntity::getType, PostTypeEnum.QUOTE.getCode())
+                .eq(PostEntity::getReferencedPostId, post.getId())
+                .isNull(PostEntity::getDeletedAt));
+        Long repostCount = postMapper.selectCountByQuery(QueryWrapper.create()
+                .eq(PostEntity::getType, PostTypeEnum.REPOST.getCode())
+                .eq(PostEntity::getRootPostId, post.getId())
+                .isNull(PostEntity::getDeletedAt));
+
         ThreadResp resp = new ThreadResp();
         resp.setPost(buildPostResp(post, currentUserId));
         resp.setAncestors(ancestorResps);
         resp.setReplies(replies);
+        resp.setTotal(total);
         resp.setHasMore(hasMore);
-        resp.setNextCursor(replies.isEmpty() ? 0L : replies.get(replies.size() - 1).getId());
+        resp.setPageNum(pageNum);
+        resp.setQuoteCount(quoteCount);
+        resp.setRepostCount(repostCount);
+        return resp;
+    }
+
+    /**
+     * 排序映射：latest → 时间倒序；liked → 点赞倒序；默认 relevant → 热度分倒序
+     */
+    private void applySort(QueryWrapper wrapper, String sort, boolean ascDefault) {
+        if ("latest".equals(sort)) {
+            wrapper.orderBy(PostEntity::getCreatedAt, false).orderBy(PostEntity::getId, false);
+        } else if ("liked".equals(sort)) {
+            wrapper.orderBy(PostEntity::getLikeCount, false).orderBy(PostEntity::getId, false);
+        } else if (sort == null || "relevant".equals(sort)) {
+            wrapper.orderBy(PostEntity::getHotScore, false).orderBy(PostEntity::getId, false);
+        } else {
+            wrapper.orderBy(PostEntity::getId, ascDefault);
+        }
+    }
+
+    /**
+     * 某条推文的引用列表 / 转推列表（详情页「查看引用」「查看转推」）
+     */
+    public RelationResp relations(Long postId, String type, String sort, Integer pageNumReq, Integer pageSizeReq, Long currentUserId) {
+        getActivePost(postId);
+        int pageSize = pageSizeReq == null || pageSizeReq <= 0 ? 20 : Math.min(pageSizeReq, 100);
+        int pageNum = pageNumReq == null || pageNumReq <= 0 ? 1 : pageNumReq;
+        boolean repost = "repost".equals(type);
+
+        QueryWrapper countWrapper = QueryWrapper.create()
+                .eq(PostEntity::getType, repost ? PostTypeEnum.REPOST.getCode() : PostTypeEnum.QUOTE.getCode())
+                .isNull(PostEntity::getDeletedAt);
+        if (repost) {
+            countWrapper.eq(PostEntity::getRootPostId, postId);
+        } else {
+            countWrapper.eq(PostEntity::getReferencedPostId, postId);
+        }
+        Long total = postMapper.selectCountByQuery(countWrapper);
+
+        QueryWrapper wrapper = QueryWrapper.create()
+                .eq(PostEntity::getType, repost ? PostTypeEnum.REPOST.getCode() : PostTypeEnum.QUOTE.getCode())
+                .isNull(PostEntity::getDeletedAt);
+        if (repost) {
+            wrapper.eq(PostEntity::getRootPostId, postId);
+        } else {
+            wrapper.eq(PostEntity::getReferencedPostId, postId);
+        }
+        applySort(wrapper, sort, false);
+        wrapper.offset((pageNum - 1) * pageSize).limit(pageSize + 1);
+        List<PostEntity> rows = postMapper.selectListByQuery(wrapper);
+        boolean hasMore = rows.size() > pageSize;
+        if (hasMore) {
+            rows = rows.subList(0, pageSize);
+        }
+
+        List<PostResp> list = new ArrayList<>();
+        for (PostEntity p : rows) {
+            try {
+                checkViewPermission(p, currentUserId);
+            } catch (BusinessException e) {
+                continue;
+            }
+            list.add(buildPostResp(p, currentUserId));
+        }
+
+        RelationResp resp = new RelationResp();
+        resp.setList(list);
+        resp.setTotal(total);
+        resp.setHasMore(hasMore);
+        resp.setPageNum(pageNum);
         return resp;
     }
 
