@@ -32,6 +32,12 @@ public class CreatePostReq extends BaseRequest {
     @Parameter(description = "回复权限，可选值：anyone/followed/mentioned（见 ReplyPermissionEnum），默认 anyone")
     private String replyPermission;
 
+    @Parameter(description = "文章标题（传了即按文章发布，仅 original 可用，≤120 字）")
+    private String articleTitle;
+
+    @Parameter(description = "文章封面图 URL")
+    private String articleCoverUrl;
+
     @Parameter(description = "媒体列表")
     private List<CreatePostMediaReq> medias;
 

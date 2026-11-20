@@ -2,6 +2,7 @@ package com.mtd.tt.controller;
 
 import com.mtd.common.core.response.PageResponse;
 import com.mtd.common.core.result.Result;
+import com.mtd.tt.model.req.ArticleListReq;
 import com.mtd.tt.model.req.CreatePostReq;
 import com.mtd.tt.model.req.HomeTimelineReq;
 import com.mtd.tt.model.req.PostIdReq;
@@ -88,6 +89,12 @@ public class PostController {
     public Result<RelationResp> relations(@RequestBody RelationReq req) {
         return Result.success(postService.relations(req.getPostId(), req.getType(), req.getSort(),
                 req.getPageNum(), req.getPageSize(), LoginUtil.currentUserId()));
+    }
+
+    @Operation(summary = "文章列表（发现 / 我的作品）")
+    @PostMapping("/articles")
+    public Result<PageResponse<PostResp>> articles(@RequestBody ArticleListReq req) {
+        return Result.success(postService.articles(req, LoginUtil.currentUserId()));
     }
 
     @Operation(summary = "搜索帖子")

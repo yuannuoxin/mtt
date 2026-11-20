@@ -43,6 +43,12 @@ public class PostResp implements Serializable {
     @Parameter(description = "是否文章")
     private Integer articleFlag;
 
+    @Parameter(description = "文章标题")
+    private String articleTitle;
+
+    @Parameter(description = "文章封面图")
+    private String articleCoverUrl;
+
     @Parameter(description = "是否有媒体")
     private Boolean hasMedia;
 

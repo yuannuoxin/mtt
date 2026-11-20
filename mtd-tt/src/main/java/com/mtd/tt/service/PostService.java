@@ -25,6 +25,7 @@ import com.mtd.tt.model.entity.PostMentionEntity;
 import com.mtd.tt.model.entity.UserEntity;
 import com.mtd.tt.model.entity.UserFileEntity;
 import com.mtd.tt.model.entity.UserTimelineEntity;
+import com.mtd.tt.model.req.ArticleListReq;
 import com.mtd.tt.model.req.CreatePostLinkCardReq;
 import com.mtd.tt.model.req.CreatePostMediaReq;
 import com.mtd.tt.model.req.CreatePostMentionReq;
@@ -127,6 +128,26 @@ public class PostService {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "不支持的帖子类型: " + type);
         }
 
+        // 文章：带标题即视为长文（articleFlag=1），只允许 original，正文为 Markdown 原文
+        String articleTitle = StrUtil.trim(req.getArticleTitle());
+        boolean isArticle = StrUtil.isNotBlank(articleTitle);
+        if (isArticle) {
+            if (typeEnum != PostTypeEnum.ORIGINAL) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文章只能以 original 类型发布");
+            }
+            if (articleTitle.length() > 120) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文章标题最多 120 字");
+            }
+            if (StrUtil.isBlank(req.getContent())) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文章正文不能为空");
+            }
+            if (req.getContent().length() > 20000) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文章正文最多 20000 字");
+            }
+        } else {
+            articleTitle = "";
+        }
+
         PostEntity referenced = null;
         if (typeEnum != PostTypeEnum.ORIGINAL) {
             if (req.getReferencedPostId() == null) {
@@ -171,7 +192,9 @@ public class PostService {
             }
         }
         post.setVisibility(StrUtil.blankToDefault(req.getVisibility(), PostVisibilityEnum.PUBLIC.getCode()));
-        post.setArticleFlag(0);
+        post.setArticleFlag(isArticle ? 1 : 0);
+        post.setArticleTitle(articleTitle);
+        post.setArticleCoverUrl(StrUtil.blankToDefault(req.getArticleCoverUrl(), ""));
         post.setReplyPermission(StrUtil.blankToDefault(req.getReplyPermission(), ReplyPermissionEnum.ANYONE.getCode()));
 
         // 媒体标记
@@ -554,6 +577,37 @@ public class PostService {
                 .orderByUnSafely("(hot_score / POWER(EXTRACT(EPOCH FROM (now() - created_at)) / 3600.0 + 2, 1.8)) DESC, id DESC");
         applyMediaTypeFilter(wrapper, mediaType);
         return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
+    }
+
+    /**
+     * 文章列表：发现（全站 articleFlag=1 的 original 长文）/ 我的作品，按发布时间倒序分页。
+     */
+    public PageResponse<PostResp> articles(ArticleListReq req, Long currentUserId) {
+        int pageNum = req.getPageNum() == null || req.getPageNum() <= 0 ? 1 : req.getPageNum();
+        int pageSize = req.getPageSize() == null || req.getPageSize() <= 0 ? 20 : Math.min(req.getPageSize(), 100);
+        boolean mine = "mine".equalsIgnoreCase(StrUtil.blankToDefault(req.getScope(), "all"));
+        QueryWrapper wrapper = QueryWrapper.create()
+                .eq(PostEntity::getArticleFlag, 1)
+                .eq(PostEntity::getType, PostTypeEnum.ORIGINAL.getCode())
+                .isNull(PostEntity::getDeletedAt);
+        if (mine) {
+            requireLogin(currentUserId);
+            wrapper.eq(PostEntity::getUserId, currentUserId);
+        }
+        wrapper.orderBy(PostEntity::getCreatedAt, false).orderBy(PostEntity::getId, false);
+        Page<PostEntity> p = postMapper.paginate(pageNum, pageSize, wrapper);
+        List<PostResp> list = p.getRecords().stream()
+                .map(post -> {
+                    try {
+                        checkViewPermission(post, currentUserId);
+                    } catch (BusinessException e) {
+                        return null;
+                    }
+                    return buildPostResp(post, currentUserId);
+                })
+                .filter(ObjectUtil::isNotNull)
+                .collect(Collectors.toList());
+        return PageResponse.of((int) p.getPageNumber(), (int) p.getPageSize(), p.getTotalRow(), list);
     }
 
     /**
@@ -966,6 +1020,8 @@ public class PostService {
         resp.setRootPostId(post.getRootPostId());
         resp.setVisibility(post.getVisibility());
         resp.setArticleFlag(post.getArticleFlag());
+        resp.setArticleTitle(post.getArticleTitle());
+        resp.setArticleCoverUrl(post.getArticleCoverUrl());
         resp.setHasMedia(post.getHasMedia());
         resp.setHasImage(post.getHasImage());
         resp.setHasVideo(post.getHasVideo());

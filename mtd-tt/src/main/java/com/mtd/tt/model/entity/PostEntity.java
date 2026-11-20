@@ -23,6 +23,10 @@ public class PostEntity extends BaseEntity {
     private Long rootPostId;
     private String visibility;
     private Integer articleFlag;
+    /** 文章标题（articleFlag=1 时有值） */
+    private String articleTitle;
+    /** 文章封面图 */
+    private String articleCoverUrl;
 
     private Boolean hasMedia;
     private Boolean hasImage;
