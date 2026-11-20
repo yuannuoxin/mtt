@@ -755,6 +755,7 @@ public class PostService {
     /**
      * 排序映射：latest → 时间倒序；liked → 点赞倒序；默认 relevant → 互动加权倒序。
      * <p>relevant 不再直接依赖 hot_score：该字段可能未回填或为 0，会导致排序退化成 id 倒序。
+     * 分数相同时按时间正序，零互动的新回复沉到后面，不再抢占首屏；要看最新在前请切到 latest。
      * 权重：转发 30 > 收藏 15 > 点赞 10 > 回复 1；二级及更深的回复再减 2，避免空评论插队。
      */
     private void applySort(QueryWrapper wrapper, String sort, boolean ascDefault) {
@@ -770,7 +771,7 @@ public class PostService {
             wrapper.orderByUnSafely(
                     "(like_count * 10 + bookmark_count * 15 + repost_count * 30 + reply_count" +
                             " - CASE WHEN referenced_post_id = root_post_id THEN 0 ELSE 2 END)" +
-                            " DESC, created_at DESC, id DESC");
+                            " DESC, created_at ASC, id ASC");
         } else {
             wrapper.orderBy(PostEntity::getId, ascDefault);
         }
