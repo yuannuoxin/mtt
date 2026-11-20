@@ -11,12 +11,15 @@ import com.mtd.tt.mapper.UserFileMapper;
 import com.mtd.tt.model.entity.UserFileEntity;
 import com.mtd.tt.model.req.PresignUploadReq;
 import com.mtd.tt.model.resp.FileUploadResp;
+import com.mtd.tt.model.resp.MyFileItemResp;
 import com.mtd.tt.service.FileStorageService;
 import com.mtd.tt.service.PointService;
 import com.mtd.tt.util.LoginUtil;
+import com.mybatisflex.core.query.QueryWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,6 +29,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 import java.time.OffsetDateTime;
+import java.util.List;
 
 /**
  * 文件接口：后端上传 / 预签名直传。
@@ -84,6 +88,35 @@ public class FileController {
         UserFileEntity rec = saveFileRecord(userId, sceneEnum, null, objectKey,
                 fileStorageService.buildAccessUrl(objectKey), null, req.getContentType(), thumbnail);
         return Result.success(toResp(presignUrl, rec.getId(), sceneEnum.getCode()));
+    }
+
+    @Operation(summary = "当前用户上传过的媒体列表（文章编辑器「我的图片 / 我的视频」）")
+    @GetMapping("/myFiles")
+    public Result<List<MyFileItemResp>> myFiles(
+            @RequestParam(value = "mediaType", required = false) String mediaType,
+            @RequestParam(value = "limit", required = false, defaultValue = "100") Integer limit) {
+        Long userId = requireLogin();
+        int max = limit == null ? 100 : Math.max(1, Math.min(limit, 200));
+        QueryWrapper wrapper = QueryWrapper.create()
+                .eq(UserFileEntity::getUserId, userId)
+                .eq(UserFileEntity::getScene, "post")
+                .eq(UserFileEntity::getThumbnail, false);
+        if (StrUtil.isNotBlank(mediaType)) {
+            wrapper.eq(UserFileEntity::getMediaType, mediaType.trim());
+        }
+        wrapper.orderBy(UserFileEntity::getCreatedAt, false).orderBy(UserFileEntity::getId, false);
+        List<UserFileEntity> files = userFileMapper.selectListByQuery(wrapper);
+        List<MyFileItemResp> items = files.stream().limit(max).map(f -> {
+            MyFileItemResp item = new MyFileItemResp();
+            item.setId(f.getId());
+            item.setUrl(f.getUrl());
+            item.setMediaType(f.getMediaType());
+            item.setContentType(f.getContentType());
+            item.setSize(f.getSize());
+            item.setCreatedAt(f.getCreatedAt());
+            return item;
+        }).toList();
+        return Result.success(items);
     }
 
     private FileUploadResp toResp(String url, Long fileId, String scene) {
