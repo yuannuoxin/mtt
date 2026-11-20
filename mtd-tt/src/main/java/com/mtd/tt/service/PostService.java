@@ -717,7 +717,11 @@ public class PostService {
         if ("latest".equals(sort)) {
             wrapper.orderBy(PostEntity::getCreatedAt, false).orderBy(PostEntity::getId, false);
         } else if ("liked".equals(sort)) {
-            wrapper.orderBy(PostEntity::getLikeCount, false).orderBy(PostEntity::getId, false);
+            wrapper.orderBy(PostEntity::getLikeCount, false);
+            wrapper.orderByUnSafely(
+                    "(bookmark_count * 15 + repost_count * 30 + reply_count" +
+                            " - CASE WHEN referenced_post_id = root_post_id THEN 0 ELSE 2 END)" +
+                            " DESC, created_at DESC, id DESC");
         } else if (sort == null || "relevant".equals(sort)) {
             wrapper.orderByUnSafely(
                     "(like_count * 10 + bookmark_count * 15 + repost_count * 30 + reply_count" +
