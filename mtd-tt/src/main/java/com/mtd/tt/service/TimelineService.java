@@ -1,6 +1,7 @@
 package com.mtd.tt.service;
 
 import cn.hutool.core.collection.CollUtil;
+import com.mtd.tt.enums.PostTypeEnum;
 import com.mtd.tt.enums.UserTimelineItemTypeEnum;
 import com.mtd.tt.mapper.FollowMapper;
 import com.mtd.tt.mapper.PostMapper;
@@ -49,6 +50,10 @@ public class TimelineService {
         if (post == null || post.getId() == null) {
             return;
         }
+        // 首页时间线只放独立推文，回复不 fanout，避免评论作为一条新动态插到前面
+        if (PostTypeEnum.REPLY.getCode().equals(post.getType())) {
+            return;
+        }
         Long authorId = post.getUserId();
         // 关注流与推特一致：只推送给粉丝，不含作者自己（自己的推文在个人主页查看）
         List<Long> followerIds = followerUserIds(authorId);
@@ -84,6 +89,8 @@ public class TimelineService {
         List<PostEntity> recent = postMapper.selectListByQuery(QueryWrapper.create()
                 .eq(PostEntity::getUserId, followeeId)
                 .isNull(PostEntity::getDeletedAt)
+                // 回填只放独立推文，回复留在原帖详情里
+                .ne(PostEntity::getType, PostTypeEnum.REPLY.getCode())
                 .orderBy(PostEntity::getId, false)
                 .limit(BACKFILL_SIZE));
         if (CollUtil.isEmpty(recent)) {

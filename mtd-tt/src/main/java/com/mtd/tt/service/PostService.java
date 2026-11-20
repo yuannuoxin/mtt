@@ -561,35 +561,53 @@ public class PostService {
         // 存量关注首次回填：时间线为空且有关注时，把已关注人的近期推文回填一次（之后靠关注/发帖增量维护）
         ensureTimelineBackfill(currentUserId);
         int pageSize = page.getPageSize();
-        QueryWrapper tlWrapper = QueryWrapper.create()
-                .eq(UserTimelineEntity::getUserId, currentUserId)
-                .eq(UserTimelineEntity::getItemType, UserTimelineItemTypeEnum.POST.getCode())
-                .eq(UserTimelineEntity::getValid, Boolean.TRUE)
-                // 关注流不含自己的推文（同推特；历史残留的自己记录也一并过滤）
-                .ne(UserTimelineEntity::getItemUserId, currentUserId)
-                .orderBy(UserTimelineEntity::getItemId, false)
-                .limit(pageSize);
-        if (maxId != null) {
-            tlWrapper.lt(UserTimelineEntity::getItemId, maxId);
+        // 首页信息流只展示独立推文：回复沉在原帖详情里，避免评论插到原帖前面。
+        // user_timeline 里可能残留历史回复，这里按批补齐到 pageSize 条有效推文再返回。
+        Long cursor = maxId;
+        int batchSize = Math.max(pageSize * 4, 40);
+        List<PostResp> list = new ArrayList<>();
+        while (list.size() < pageSize) {
+            QueryWrapper tlWrapper = QueryWrapper.create()
+                    .eq(UserTimelineEntity::getUserId, currentUserId)
+                    .eq(UserTimelineEntity::getItemType, UserTimelineItemTypeEnum.POST.getCode())
+                    .eq(UserTimelineEntity::getValid, Boolean.TRUE)
+                    // 关注流不含自己的推文（同推特；历史残留的自己记录也一并过滤）
+                    .ne(UserTimelineEntity::getItemUserId, currentUserId)
+                    .orderBy(UserTimelineEntity::getItemId, false)
+                    .limit(batchSize);
+            if (cursor != null) {
+                tlWrapper.lt(UserTimelineEntity::getItemId, cursor);
+            }
+            List<UserTimelineEntity> tls = userTimelineMapper.selectListByQuery(tlWrapper);
+            if (CollUtil.isEmpty(tls)) {
+                break;
+            }
+            for (UserTimelineEntity tl : tls) {
+                cursor = tl.getItemId();
+                PostEntity post = postMapper.selectOneById(tl.getItemId());
+                if (post == null || post.getDeletedAt() != null) {
+                    continue;
+                }
+                if (PostTypeEnum.REPLY.getCode().equals(post.getType())) {
+                    continue;
+                }
+                if (!matchMediaType(post, mediaType)) {
+                    continue;
+                }
+                try {
+                    checkViewPermission(post, currentUserId);
+                } catch (BusinessException e) {
+                    continue;
+                }
+                list.add(buildPostResp(post, currentUserId));
+                if (list.size() >= pageSize) {
+                    break;
+                }
+            }
+            if (tls.size() < batchSize) {
+                break;
+            }
         }
-        List<UserTimelineEntity> tls = userTimelineMapper.selectListByQuery(tlWrapper);
-        List<PostResp> list = tls.stream().map(tl -> {
-                    PostEntity post = postMapper.selectOneById(tl.getItemId());
-                    if (post == null || post.getDeletedAt() != null) {
-                        return null;
-                    }
-                    if (!matchMediaType(post, mediaType)) {
-                        return null;
-                    }
-                    try {
-                        checkViewPermission(post, currentUserId);
-                    } catch (BusinessException e) {
-                        return null;
-                    }
-                    return buildPostResp(post, currentUserId);
-                })
-                .filter(ObjectUtil::isNotNull)
-                .collect(Collectors.toList());
         return PageResponse.of(page.getPageNum(), page.getPageSize(), (long) list.size(), list);
     }
 
@@ -618,6 +636,8 @@ public class PostService {
     public PageResponse<PostResp> globalTimeline(Long currentUserId, PageRequest page, Long maxId, String mediaType) {
         QueryWrapper wrapper = QueryWrapper.create()
                 .isNull(PostEntity::getDeletedAt)
+                // 推荐流只展示独立推文，回复留在原帖详情里
+                .ne(PostEntity::getType, PostTypeEnum.REPLY.getCode())
                 .orderByUnSafely("(hot_score / POWER(EXTRACT(EPOCH FROM (now() - created_at)) / 3600.0 + 2, 1.8)) DESC, id DESC");
         applyMediaTypeFilter(wrapper, mediaType);
         return pagedPosts(wrapper, maxId, page.getPageSize(), currentUserId);
