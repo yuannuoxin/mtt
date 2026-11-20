@@ -310,18 +310,9 @@ public class PostInteractService {
                 throw bad("投票选项不存在");
             }
         }
-        if (!multi) {
-            jdbcTemplate.update("DELETE FROM post_poll_votes WHERE post_id = ? AND user_id = ?", postId, userId);
-        } else {
-            for (Integer idx : picked) {
-                Long already = jdbcTemplate.queryForObject(
-                        "SELECT COUNT(*) FROM post_poll_votes WHERE post_id = ? AND user_id = ? AND option_index = ?",
-                        Long.class, postId, userId, idx);
-                if (already != null && already > 0) {
-                    throw bad("已经投过其中某个选项");
-                }
-            }
-        }
+        // 整组覆盖：先清空该用户在这条投票下的旧票，再写入本次选择。
+        // 多选修改时既能增加选项，也能取消已选项。
+        jdbcTemplate.update("DELETE FROM post_poll_votes WHERE post_id = ? AND user_id = ?", postId, userId);
         for (Integer idx : picked) {
             jdbcTemplate.update(
                     "INSERT INTO post_poll_votes(post_id, user_id, option_index) VALUES (?,?,?) ON CONFLICT DO NOTHING",
@@ -420,7 +411,7 @@ public class PostInteractService {
         if (!PostKindEnum.LOTTERY.getCode().equals(kindOf(post))) {
             throw bad("该帖子不是抽奖");
         }
-        if (!post.getUserId().equals(userId) && !isAdmin(userId)) {
+        if (!post.getUserId().equals(userId)) {
             throw bad("只有楼主可以开奖");
         }
         Map<String, Object> meta = parseMeta(post);
@@ -505,8 +496,35 @@ public class PostInteractService {
                 .filter(m -> m != null)
                 .collect(Collectors.toList());
         view.put("winnerUsers", winnerUsers);
+
+        // 奖品名额按槽位顺序绑定中奖用户：一等奖名额先用完，再轮到下一个奖品。
+        List<Map<String, Object>> prizeItems = new ArrayList<>();
+        int cursor = 0;
+        if (meta.get("prizes") instanceof List<?> prizes) {
+            for (Object pv : prizes) {
+                if (!(pv instanceof Map<?, ?> pm)) {
+                    continue;
+                }
+                String name = str(pm.get("name"));
+                int count = intVal(pm.get("count"), 0);
+                List<Map<String, Object>> prizeWinners = new ArrayList<>();
+                for (int j = 0; j < count && cursor < winners.size(); j++) {
+                    Map<String, Object> brief = userBrief(winners.get(cursor));
+                    if (brief != null) {
+                        prizeWinners.add(brief);
+                    }
+                    cursor++;
+                }
+                Map<String, Object> item = new LinkedHashMap<>();
+                item.put("name", name);
+                item.put("count", count);
+                item.put("winners", prizeWinners);
+                prizeItems.add(item);
+            }
+        }
+        view.put("prizes", prizeItems);
         boolean drawn = bool(meta.get("drawn"), false);
-        view.put("canDraw", (isAuthor || admin) && !drawn && entrants != null && entrants > 0);
+        view.put("canDraw", isAuthor && !drawn && entrants != null && entrants > 0);
         view.put("joined", viewerId != null && jdbcTemplate.queryForObject(
                 "SELECT COUNT(*) FROM posts WHERE referenced_post_id = ? AND user_id = ? AND deleted_at IS NULL",
                 Long.class, post.getId(), viewerId) > 0);

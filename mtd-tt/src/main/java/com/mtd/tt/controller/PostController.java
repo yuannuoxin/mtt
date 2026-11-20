@@ -205,7 +205,7 @@ public class PostController {
                 LoginUtil.currentUserId(), req.getPostId(), req.getReplyId()));
     }
 
-    @Operation(summary = "抽奖开奖（仅楼主/管理员）")
+    @Operation(summary = "抽奖开奖（仅楼主）")
     @PostMapping("/lottery/draw")
     public Result<java.util.Map<String, Object>> drawLottery(@RequestBody PostIdReq req) {
         return Result.success(postInteractService.drawLottery(LoginUtil.currentUserId(), req.getPostId()));
