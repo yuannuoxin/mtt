@@ -49,6 +49,7 @@ import com.mtd.tt.enums.PostVisibilityEnum;
 import com.mtd.tt.enums.ReplyPermissionEnum;
 import com.mtd.tt.enums.UserTimelineItemTypeEnum;
 import com.mtd.tt.util.RedisPostCounter;
+import com.mtd.tt.util.HideMarkdown;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
 import lombok.extern.slf4j.Slf4j;
@@ -114,6 +115,8 @@ public class PostService {
     private PointService pointService;
     @Autowired
     private ExpService expService;
+    @Autowired
+    private HideContentService hideContentService;
 
     /**
      * 创建帖子（original / reply / quote / repost）
@@ -147,6 +150,7 @@ public class PostService {
         } else {
             articleTitle = "";
         }
+        hideContentService.validateForCreate(req.getContent());
 
         PostEntity referenced = null;
         if (typeEnum != PostTypeEnum.ORIGINAL) {
@@ -478,6 +482,33 @@ public class PostService {
         PostEntity post = getActivePost(postId);
         checkViewPermission(post, currentUserId);
         redisCounter.incr(postId, RedisPostCounter.VIEW); // 浏览计数走 Redis
+        return buildPostResp(post, currentUserId);
+    }
+
+    /**
+     * 积分解锁隐藏内容：一次支付解锁本帖全部积分块。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public PostResp unlockByPoints(Long currentUserId, Long postId) {
+        requireLogin(currentUserId);
+        PostEntity post = getActivePost(postId);
+        checkViewPermission(post, currentUserId);
+        hideContentService.unlockByPoints(postId, currentUserId);
+        return buildPostResp(post, currentUserId);
+    }
+
+    /**
+     * 密码解锁隐藏内容：游客也可用；登录用户与游客的解锁记录分别保存。
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public PostResp unlockByPassword(Long currentUserId, Long postId, String password, String guestToken) {
+        PostEntity post = getActivePost(postId);
+        checkViewPermission(post, currentUserId);
+        if (currentUserId == null && StrUtil.isBlank(guestToken)) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "无法建立访客会话，请登录后重试");
+        }
+        List<Integer> indexes = hideContentService.matchPassword(post.getContent(), password);
+        hideContentService.savePasswordUnlocks(postId, currentUserId, guestToken, indexes);
         return buildPostResp(post, currentUserId);
     }
 
@@ -1024,7 +1055,11 @@ public class PostService {
         resp.setId(post.getId());
         resp.setUserId(post.getUserId());
         resp.setType(post.getType());
-        resp.setContent(post.getContent());
+        // 隐藏内容按当前读者能力由服务端脱敏；未解锁正文不会随响应下发
+        HideMarkdown.Sanitized sanitized =
+                hideContentService.sanitize(post.getContent(), post.getId(), post.getUserId(), currentUserId);
+        resp.setContent(sanitized.content);
+        resp.setHideBlocks(hideContentService.toRespList(sanitized.statuses));
         resp.setReferencedPostId(post.getReferencedPostId());
         resp.setRootPostId(post.getRootPostId());
         resp.setVisibility(post.getVisibility());

@@ -9,15 +9,19 @@ import com.mtd.tt.model.req.PostIdReq;
 import com.mtd.tt.model.req.PostRepliesReq;
 import com.mtd.tt.model.req.SearchPostReq;
 import com.mtd.tt.model.req.ThreadReq;
+import com.mtd.tt.model.req.UnlockPasswordReq;
 import com.mtd.tt.model.req.UserPostsReq;
 import com.mtd.tt.model.req.RelationReq;
 import com.mtd.tt.model.resp.PostResp;
 import com.mtd.tt.model.resp.RelationResp;
 import com.mtd.tt.model.resp.ThreadResp;
 import com.mtd.tt.service.PostService;
+import com.mtd.tt.service.HideContentService;
 import com.mtd.tt.util.LoginUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -34,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class PostController {
 
     private final PostService postService;
+    private final HideContentService hideContentService;
 
     @Operation(summary = "创建帖子（original/reply/quote/repost）")
     @PostMapping("/create")
@@ -52,6 +57,23 @@ public class PostController {
     @PostMapping("/detail")
     public Result<PostResp> detail(@RequestBody PostIdReq req) {
         return Result.success(postService.postDetail(req.getPostId(), LoginUtil.currentUserId()));
+    }
+
+    @Operation(summary = "积分解锁隐藏内容")
+    @PostMapping("/unlock")
+    public Result<PostResp> unlock(@RequestBody PostIdReq req) {
+        return Result.success(postService.unlockByPoints(LoginUtil.currentUserId(), req.getPostId()));
+    }
+
+    @Operation(summary = "密码解锁隐藏内容（游客可用）")
+    @PostMapping("/unlockPassword")
+    public Result<PostResp> unlockPassword(@RequestBody UnlockPasswordReq req,
+                                           HttpServletRequest request,
+                                           HttpServletResponse response) {
+        Long userId = LoginUtil.currentUserId();
+        String guestToken = hideContentService.ensureGuestToken(request, response, userId == null);
+        return Result.success(postService.unlockByPassword(
+                userId, req.getPostId(), req.getPassword(), guestToken));
     }
 
     @Operation(summary = "某用户的帖子列表")

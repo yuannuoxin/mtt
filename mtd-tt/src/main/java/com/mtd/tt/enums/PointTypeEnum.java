@@ -16,7 +16,9 @@ public enum PointTypeEnum {
     REPOST("repost", "转发"),
     REPLY("reply", "回复"),
     UPLOAD("upload", "上传文件"),
-    REGISTER("register", "注册赠送");
+    REGISTER("register", "注册赠送"),
+    UNLOCK_POST("unlock_post", "解锁隐藏内容"),
+    UNLOCK_POST_EARN("unlock_post_earn", "隐藏内容解锁收益");
 
     private final String code;
     private final String desc;

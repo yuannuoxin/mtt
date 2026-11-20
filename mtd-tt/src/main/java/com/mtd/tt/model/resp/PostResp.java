@@ -88,6 +88,9 @@ public class PostResp implements Serializable {
     @Parameter(description = "@提及列表")
     private List<PostMentionResp> mentions;
 
+    @Parameter(description = "正文隐藏块的访问状态（未解锁正文已被服务端打码）")
+    private List<HideBlockResp> hideBlocks;
+
     @Parameter(description = "链接卡片")
     private PostLinkCardResp linkCard;
 
