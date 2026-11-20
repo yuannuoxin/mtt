@@ -3,7 +3,9 @@ package com.mtd.tt.controller;
 import com.mtd.common.core.response.PageResponse;
 import com.mtd.common.core.result.Result;
 import com.mtd.tt.model.req.ArticleListReq;
+import com.mtd.tt.model.req.AcceptAnswerReq;
 import com.mtd.tt.model.req.CreatePostReq;
+import com.mtd.tt.model.req.PollVoteReq;
 import com.mtd.tt.model.req.HomeTimelineReq;
 import com.mtd.tt.model.req.PostIdReq;
 import com.mtd.tt.model.req.PostRepliesReq;
@@ -17,6 +19,7 @@ import com.mtd.tt.model.resp.RelationResp;
 import com.mtd.tt.model.resp.ThreadResp;
 import com.mtd.tt.service.PostService;
 import com.mtd.tt.service.HideContentService;
+import com.mtd.tt.service.PostInteractService;
 import com.mtd.tt.util.LoginUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -39,6 +42,7 @@ public class PostController {
 
     private final PostService postService;
     private final HideContentService hideContentService;
+    private final PostInteractService postInteractService;
 
     @Operation(summary = "创建帖子（original/reply/quote/repost）")
     @PostMapping("/create")
@@ -164,5 +168,46 @@ public class PostController {
     @PostMapping("/myBookmarks")
     public Result<PageResponse<PostResp>> myBookmarks(@RequestBody HomeTimelineReq req) {
         return Result.success(postService.myBookmarks(LoginUtil.currentUserId(), req));
+    }
+
+    // ===== 六类互动：投票 / 问答采纳 / 悬赏结算 / 抽奖开奖 =====
+
+    @Operation(summary = "投票")
+    @PostMapping("/poll/vote")
+    public Result<java.util.Map<String, Object>> pollVote(@RequestBody PollVoteReq req) {
+        return Result.success(postInteractService.vote(
+                LoginUtil.currentUserId(), req.getPostId(), req.getOptionIndexes()));
+    }
+
+    @Operation(summary = "结束投票（仅楼主/管理员）")
+    @PostMapping("/poll/close")
+    public Result<java.util.Map<String, Object>> pollClose(@RequestBody PostIdReq req) {
+        return Result.success(postInteractService.closePoll(LoginUtil.currentUserId(), req.getPostId()));
+    }
+
+    @Operation(summary = "采纳回答（问答/悬赏，仅楼主/管理员）")
+    @PostMapping("/question/accept")
+    public Result<java.util.Map<String, Object>> acceptAnswer(@RequestBody AcceptAnswerReq req) {
+        return Result.success(postInteractService.acceptAnswer(
+                LoginUtil.currentUserId(), req.getPostId(), req.getReplyId()));
+    }
+
+    @Operation(summary = "重新打开问答（仅楼主/管理员）")
+    @PostMapping("/question/reopen")
+    public Result<java.util.Map<String, Object>> reopenQuestion(@RequestBody PostIdReq req) {
+        return Result.success(postInteractService.reopenQuestion(LoginUtil.currentUserId(), req.getPostId()));
+    }
+
+    @Operation(summary = "悬赏采纳回答（仅楼主/管理员）")
+    @PostMapping("/bounty/accept")
+    public Result<java.util.Map<String, Object>> acceptBounty(@RequestBody AcceptAnswerReq req) {
+        return Result.success(postInteractService.acceptAnswer(
+                LoginUtil.currentUserId(), req.getPostId(), req.getReplyId()));
+    }
+
+    @Operation(summary = "抽奖开奖（仅楼主/管理员）")
+    @PostMapping("/lottery/draw")
+    public Result<java.util.Map<String, Object>> drawLottery(@RequestBody PostIdReq req) {
+        return Result.success(postInteractService.drawLottery(LoginUtil.currentUserId(), req.getPostId()));
     }
 }

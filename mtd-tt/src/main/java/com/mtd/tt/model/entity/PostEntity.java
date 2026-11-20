@@ -17,6 +17,12 @@ public class PostEntity extends BaseEntity {
      * original / repost / quote / reply
      */
     private String type;
+    /**
+     * discussion / question / poll / bounty / lottery
+     */
+    private String kind;
+    /** 互动类型元数据（JSON） */
+    private String interactMeta;
     private String content;
 
     private Long referencedPostId;

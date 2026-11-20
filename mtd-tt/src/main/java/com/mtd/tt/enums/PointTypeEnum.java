@@ -18,7 +18,10 @@ public enum PointTypeEnum {
     UPLOAD("upload", "上传文件"),
     REGISTER("register", "注册赠送"),
     UNLOCK_POST("unlock_post", "解锁隐藏内容"),
-    UNLOCK_POST_EARN("unlock_post_earn", "隐藏内容解锁收益");
+    UNLOCK_POST_EARN("unlock_post_earn", "隐藏内容解锁收益"),
+    BOUNTY_ESCROW("bounty_escrow", "悬赏托管扣除"),
+    BOUNTY_AWARD("bounty_award", "悬赏采纳奖励"),
+    BOUNTY_REFUND("bounty_refund", "悬赏退还");
 
     private final String code;
     private final String desc;

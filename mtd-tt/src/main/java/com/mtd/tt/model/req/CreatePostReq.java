@@ -17,6 +17,12 @@ public class CreatePostReq extends BaseRequest {
     @Parameter(description = "帖子类型，可选值：original/reply/quote/repost（见 PostTypeEnum）", required = true)
     private String type;
 
+    @Parameter(description = "互动类型：discussion/question/poll/bounty/lottery，默认 discussion")
+    private String kind;
+
+    @Parameter(description = "互动配置：投票选项、悬赏积分、抽奖奖品、问答等")
+    private java.util.Map<String, Object> interact;
+
     @Parameter(description = "正文内容")
     private String content;
 

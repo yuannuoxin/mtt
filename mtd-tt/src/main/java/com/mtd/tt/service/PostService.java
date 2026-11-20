@@ -117,6 +117,8 @@ public class PostService {
     private ExpService expService;
     @Autowired
     private HideContentService hideContentService;
+    @Autowired
+    private PostInteractService postInteractService;
 
     /**
      * 创建帖子（original / reply / quote / repost）
@@ -152,6 +154,11 @@ public class PostService {
         }
         hideContentService.validateForCreate(req.getContent());
 
+        // 互动类型只允许挂在原创主帖（推文/文章）上，回复/引用/转发固定为普通讨论
+        PostInteractService.Normalized interact = typeEnum == PostTypeEnum.ORIGINAL
+                ? postInteractService.normalize(req.getKind(), req.getInteract())
+                : postInteractService.normalize("discussion", null);
+
         PostEntity referenced = null;
         if (typeEnum != PostTypeEnum.ORIGINAL) {
             if (req.getReferencedPostId() == null) {
@@ -180,6 +187,8 @@ public class PostService {
         PostEntity post = new PostEntity();
         post.setUserId(currentUserId);
         post.setType(type);
+        post.setKind(interact.kind());
+        post.setInteractMeta(interact.metaJson());
         post.setContent(req.getContent());
         if (typeEnum == PostTypeEnum.QUOTE || typeEnum == PostTypeEnum.REPOST) {
             // 引用：目标就是被引用那条推文；引用帖是一条独立推文，自己就是对话根，root 留空。
@@ -224,6 +233,8 @@ public class PostService {
         expService.gainExp(currentUserId, type);
         postMapper.insertSelective(post);
         Long postId = post.getId();
+        // 悬赏积分从楼主余额转入托管，与插入在同一事务，余额不足则整体回滚
+        postInteractService.escrowBounty(currentUserId, post);
 
         // 媒体
         if (hasMedia) {
@@ -462,6 +473,8 @@ public class PostService {
         if (!post.getUserId().equals(currentUserId)) {
             throw new BusinessException(ResultCode.FORBIDDEN.getCode(), "只能删除自己的帖子");
         }
+        // 悬赏未结算时先把托管积分退回楼主，再软删除
+        postInteractService.refundBounty(post);
         post.setDeletedAt(OffsetDateTime.now());
         postMapper.update(post);
         // 取消引用/取消转发 = 删除这条推文：把被引用原帖的转发计数与"已转发"关系同步减回去
@@ -1055,6 +1068,10 @@ public class PostService {
         resp.setId(post.getId());
         resp.setUserId(post.getUserId());
         resp.setType(post.getType());
+        resp.setKind(postInteractService.kindOf(post));
+        // 互动状态按当前读者计算；问答/悬赏的采纳回复在下面补成完整卡片
+        java.util.Map<String, Object> interactView = postInteractService.buildView(post, currentUserId);
+        resp.setInteract(interactView);
         // 隐藏内容按当前读者能力由服务端脱敏；未解锁正文不会随响应下发
         HideMarkdown.Sanitized sanitized =
                 hideContentService.sanitize(post.getContent(), post.getId(), post.getUserId(), currentUserId);
@@ -1120,6 +1137,16 @@ public class PostService {
             PostEntity ref = postMapper.selectOneById(post.getReferencedPostId());
             if (ref != null && ref.getDeletedAt() == null) {
                 resp.setReferencedPost(buildPostResp(ref, currentUserId, depth + 1));
+            }
+        }
+        // 采纳回答：只补一层摘要卡片，depth=2 不再取它引用的提问，避免循环
+        Object accepted = interactView.get("acceptedReplyId");
+        if (accepted instanceof Number n && n.longValue() > 0) {
+            PostEntity reply = postMapper.selectOneById(n.longValue());
+            if (reply != null && reply.getDeletedAt() == null) {
+                PostResp acceptedResp = buildPostResp(reply, currentUserId, 2);
+                acceptedResp.setReferencedPost(null);
+                interactView.put("acceptedReply", acceptedResp);
             }
         }
         return resp;

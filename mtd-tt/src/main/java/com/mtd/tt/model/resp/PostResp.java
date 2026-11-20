@@ -25,6 +25,12 @@ public class PostResp implements Serializable {
     @Parameter(description = "帖子类型：original/reply/quote/repost")
     private String type;
 
+    @Parameter(description = "互动类型：discussion/question/poll/bounty/lottery")
+    private String kind;
+
+    @Parameter(description = "互动状态：投票结果、问答采纳、悬赏结算、抽奖中奖名单")
+    private java.util.Map<String, Object> interact;
+
     @Parameter(description = "正文内容")
     private String content;
 
