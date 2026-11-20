@@ -30,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 文件接口：后端上传 / 预签名直传。
@@ -92,7 +93,7 @@ public class FileController {
 
     @Operation(summary = "当前用户上传过的媒体列表（文章编辑器「我的图片 / 我的视频」）")
     @GetMapping("/myFiles")
-    public Result<List<MyFileItemResp>> myFiles(
+    public Result<Map<String, List<MyFileItemResp>>> myFiles(
             @RequestParam(value = "mediaType", required = false) String mediaType,
             @RequestParam(value = "limit", required = false, defaultValue = "100") Integer limit) {
         Long userId = requireLogin();
@@ -116,7 +117,7 @@ public class FileController {
             item.setCreatedAt(f.getCreatedAt());
             return item;
         }).toList();
-        return Result.success(items);
+        return Result.success(Map.of("items", items));
     }
 
     private FileUploadResp toResp(String url, Long fileId, String scene) {
