@@ -30,5 +30,7 @@ public class UserFileEntity extends BaseEntity {
     private Long postId;
     /** 是否缩略图 */
     private Boolean thumbnail;
+    /** 缩略图对应的原图 user_files.id（新上传显式写入；老数据为空，查询时按时间兜底） */
+    private Long thumbnailOfFileId;
     private OffsetDateTime createdAt;
 }

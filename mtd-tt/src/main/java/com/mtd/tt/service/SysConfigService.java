@@ -125,6 +125,8 @@ public class SysConfigService {
                 jdbcTemplate.execute("ALTER TABLE user_files RENAME COLUMN is_thumbnail TO thumbnail");
             } catch (Exception ignored) {
             }
+            // 缩略图显式记录所属原图 id；老数据为空，myFiles 查询时按时间兜底
+            jdbcTemplate.execute("ALTER TABLE user_files ADD COLUMN IF NOT EXISTS thumbnail_of_file_id BIGINT");
             reloadCache();
             log.info("sys_config 初始化完成，配置项 {} 条", cache.size());
         } catch (Exception e) {

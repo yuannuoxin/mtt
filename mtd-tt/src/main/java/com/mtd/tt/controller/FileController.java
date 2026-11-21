@@ -54,18 +54,20 @@ public class FileController {
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "scene", required = false, defaultValue = "post") String scene,
             @RequestParam(value = "thumbnail", required = false, defaultValue = "false") boolean thumbnail,
+            @RequestParam(value = "thumbnailOfFileId", required = false) Long thumbnailOfFileId,
             @RequestParam(value = "mediaType", required = false) String mediaType) {
         if (file == null || file.isEmpty()) {
             throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "上传文件不能为空");
         }
         Long userId = requireLogin();
         FileSceneEnum sceneEnum = resolveScene(scene);
+        Long parentId = resolveThumbnailParent(userId, thumbnail, thumbnailOfFileId);
         // 上传扣积分（按文件大小，不足1MB按1MB）；积分不足拒绝
         pointService.deductForUpload(userId, file.getSize());
         String objectKey = buildObjectKey(userId, sceneEnum, file.getOriginalFilename(), thumbnail);
         try {
             String url = fileStorageService.upload(objectKey, file.getInputStream(), file.getSize(), file.getContentType());
-            UserFileEntity rec = saveFileRecord(userId, sceneEnum, mediaType, objectKey, url, file.getSize(), file.getContentType(), thumbnail);
+            UserFileEntity rec = saveFileRecord(userId, sceneEnum, mediaType, objectKey, url, file.getSize(), file.getContentType(), thumbnail, parentId);
             return Result.success(toResp(url, rec.getId(), sceneEnum.getCode()));
         } catch (IOException e) {
             throw new BusinessException(ResultCode.ERROR.getCode(), "读取上传文件失败: " + e.getMessage());
@@ -81,6 +83,7 @@ public class FileController {
         Long userId = requireLogin();
         FileSceneEnum sceneEnum = resolveScene(req.getScene());
         boolean thumbnail = Boolean.TRUE.equals(req.getThumbnail());
+        Long parentId = resolveThumbnailParent(userId, thumbnail, req.getThumbnailOfFileId());
         // 上传扣积分（按前端上报的文件大小，不足1MB按1MB）；积分不足拒绝
         long size = req.getSize() == null ? 0L : req.getSize();
         pointService.deductForUpload(userId, size);
@@ -88,7 +91,7 @@ public class FileController {
         String presignUrl = fileStorageService.presignUploadUrl(objectKey, req.getContentType());
         // 预建文件记录：url 存可访问地址（供发推时按 url 关联），前端 PUT 成功后即实际生效
         UserFileEntity rec = saveFileRecord(userId, sceneEnum, null, objectKey,
-                fileStorageService.buildAccessUrl(objectKey), null, req.getContentType(), thumbnail);
+                fileStorageService.buildAccessUrl(objectKey), null, req.getContentType(), thumbnail, parentId);
         return Result.success(toResp(presignUrl, rec.getId(), sceneEnum.getCode()));
     }
 
@@ -104,10 +107,17 @@ public class FileController {
                 .eq(UserFileEntity::getScene, "post");
         wrapper.orderBy(UserFileEntity::getCreatedAt, false).orderBy(UserFileEntity::getId, false);
         List<UserFileEntity> all = userFileMapper.selectListByQuery(wrapper);
-        // 缩略图与原图是两条独立上传记录（各自 uuid），没有外键；按「同一推文 + 创建时间紧随原图」配对。
+        // 缩略图与原图是两条独立上传记录（各自 uuid）。新数据在缩略图行上直接保存原图 id，
+        // 老数据没有该字段，仍按「同一推文 + 创建时间紧随原图」兜底。
         List<UserFileEntity> thumbs = all.stream()
                 .filter(f -> Boolean.TRUE.equals(f.getThumbnail()))
                 .toList();
+        java.util.Map<Long, UserFileEntity> explicitThumb = new java.util.HashMap<>();
+        for (UserFileEntity t : thumbs) {
+            if (t.getThumbnailOfFileId() != null) {
+                explicitThumb.put(t.getThumbnailOfFileId(), t);
+            }
+        }
         java.util.Set<Long> usedThumb = new java.util.HashSet<>();
         String wantedType = StrUtil.isBlank(mediaType) ? null : mediaType.trim();
         List<MyFileItemResp> items = new java.util.ArrayList<>();
@@ -148,6 +158,11 @@ public class FileController {
                     bestScore = score;
                     best = t;
                 }
+            }
+            // 显式关联优先：缩略图行直接记录了原图 id，不受 15 秒时间窗限制
+            UserFileEntity explicit = explicitThumb.get(f.getId());
+            if (explicit != null && !usedThumb.contains(explicit.getId())) {
+                best = explicit;
             }
             MyFileItemResp item = new MyFileItemResp();
             item.setId(f.getId());
@@ -236,8 +251,28 @@ public class FileController {
         return scene.getCode() + "/" + month + "/u_" + userId + "_" + IdUtil.fastSimpleUUID() + thumb + ext;
     }
 
+    /**
+     * 校验缩略图显式关联的原图 id：必须存在、属于当前用户，且本身不是缩略图。
+     */
+    private Long resolveThumbnailParent(Long userId, boolean thumbnail, Long thumbnailOfFileId) {
+        if (thumbnailOfFileId == null) {
+            return null;
+        }
+        if (!thumbnail) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "只有缩略图才能指定 thumbnailOfFileId");
+        }
+        UserFileEntity parent = userFileMapper.selectOneByQuery(QueryWrapper.create()
+                .eq(UserFileEntity::getId, thumbnailOfFileId)
+                .eq(UserFileEntity::getUserId, userId));
+        if (parent == null || Boolean.TRUE.equals(parent.getThumbnail())) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "缩略图关联的原图不存在或不属于当前用户");
+        }
+        return thumbnailOfFileId;
+    }
+
     private UserFileEntity saveFileRecord(Long userId, FileSceneEnum scene, String mediaType,
-                                          String objectKey, String url, Long size, String contentType, boolean thumbnail) {
+                                          String objectKey, String url, Long size, String contentType, boolean thumbnail,
+                                          Long thumbnailOfFileId) {
         UserFileEntity rec = new UserFileEntity();
         rec.setUserId(userId);
         rec.setScene(scene.getCode());
@@ -247,6 +282,7 @@ public class FileController {
         rec.setSize(size);
         rec.setContentType(contentType);
         rec.setThumbnail(thumbnail);
+        rec.setThumbnailOfFileId(thumbnailOfFileId);
         rec.setCreatedAt(OffsetDateTime.now());
         userFileMapper.insertSelective(rec);
         return rec;

@@ -24,6 +24,9 @@ public class PresignUploadReq extends BaseRequest {
     @Parameter(description = "是否缩略图（路径体现 _thumb）")
     private Boolean thumbnail;
 
+    @Parameter(description = "缩略图所属原图的 user_files.id（仅 thumbnail=true 时有效）")
+    private Long thumbnailOfFileId;
+
     @Parameter(description = "文件大小（字节），用于按上传大小扣积分（不足1MB按1MB）")
     private Long size;
 }
