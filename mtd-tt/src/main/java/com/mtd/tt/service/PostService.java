@@ -75,6 +75,8 @@ public class PostService {
 
     /** 单帖图片上限 */
     private static final int MAX_IMAGES = 4;
+    private static final int MAX_VIDEOS = 4;
+    private static final int MAX_AUDIOS = 1;
 
     /**
      * 热度落库挡位：互动热度先在 Redis 累计，达到该阈值才写一次 DB。
@@ -239,20 +241,25 @@ public class PostService {
 
         // 媒体
         if (hasMedia) {
-            // 校验类型与数量：图片最多4张；视频/音频合计最多1个；图片与音视频互斥
+            // 校验类型与数量：图片最多4张；视频最多4个；音频最多1个；图片、视频、音频三类互斥
             long imgCount = req.getMedias().stream()
                     .filter(m -> MediaTypeEnum.IMAGE.getCode().equals(m.getMediaType())).count();
-            long nonImgCount = req.getMedias().stream()
-                    .filter(m -> MediaTypeEnum.VIDEO.getCode().equals(m.getMediaType())
-                            || MediaTypeEnum.AUDIO.getCode().equals(m.getMediaType())).count();
+            long videoCount = req.getMedias().stream()
+                    .filter(m -> MediaTypeEnum.VIDEO.getCode().equals(m.getMediaType())).count();
+            long audioCount = req.getMedias().stream()
+                    .filter(m -> MediaTypeEnum.AUDIO.getCode().equals(m.getMediaType())).count();
             if (imgCount > MAX_IMAGES) {
                 throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "图片最多上传 " + MAX_IMAGES + " 张");
             }
-            if (nonImgCount > 1) {
-                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "视频/音频最多上传 1 个");
+            if (videoCount > MAX_VIDEOS) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "视频最多上传 " + MAX_VIDEOS + " 个");
             }
-            if (imgCount > 0 && nonImgCount > 0) {
-                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "图片与音视频不能同时上传");
+            if (audioCount > MAX_AUDIOS) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "音频最多上传 " + MAX_AUDIOS + " 个");
+            }
+            int kindCount = (imgCount > 0 ? 1 : 0) + (videoCount > 0 ? 1 : 0) + (audioCount > 0 ? 1 : 0);
+            if (kindCount > 1) {
+                throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "图片、视频、音频不能同时上传");
             }
             for (CreatePostMediaReq item : req.getMedias()) {
                 String mediaType = item.getMediaType();
