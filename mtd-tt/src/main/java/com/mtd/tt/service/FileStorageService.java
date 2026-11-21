@@ -176,21 +176,23 @@ public class FileStorageService {
      * 删除文件（供测试清理等使用；不对外暴露接口）
      */
     public boolean delete(String objectKey) {
-        if (isLocal()) {
+        boolean ok = true;
+        // 兼容历史本地文件：即使已切到对象存储，也尝试清理同 key 的旧磁盘文件
+        try {
+            Files.deleteIfExists(resolveLocalPath(objectKey));
+        } catch (Exception e) {
+            // 本地不存在或路径不合法都不影响对象存储删除
+            log.debug("清理本地历史文件跳过: {}", e.getMessage());
+        }
+        if (!isLocal()) {
             try {
-                return Files.deleteIfExists(resolveLocalPath(objectKey));
+                s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(objectKey).build());
             } catch (Exception e) {
-                log.error("删除本地文件失败: {}", e.getMessage(), e);
-                return false;
+                log.error("删除对象失败: {}", e.getMessage(), e);
+                ok = false;
             }
         }
-        try {
-            s3Client.deleteObject(DeleteObjectRequest.builder().bucket(bucket).key(objectKey).build());
-            return true;
-        } catch (Exception e) {
-            log.error("删除对象失败: {}", e.getMessage(), e);
-            return false;
-        }
+        return ok;
     }
 
     private String uploadLocal(String objectKey, InputStream stream) {

@@ -9,6 +9,7 @@ import com.mtd.common.core.result.ResultCode;
 import com.mtd.tt.enums.FileSceneEnum;
 import com.mtd.tt.mapper.UserFileMapper;
 import com.mtd.tt.model.entity.UserFileEntity;
+import com.mtd.tt.model.req.DeleteFileReq;
 import com.mtd.tt.model.req.PresignUploadReq;
 import com.mtd.tt.model.resp.FileUploadResp;
 import com.mtd.tt.model.resp.MyFileItemResp;
@@ -114,10 +115,35 @@ public class FileController {
             item.setMediaType(f.getMediaType());
             item.setContentType(f.getContentType());
             item.setSize(f.getSize());
+            item.setPostId(f.getPostId());
             item.setCreatedAt(f.getCreatedAt());
             return item;
         }).toList();
         return Result.success(Map.of("items", items));
+    }
+
+    @Operation(summary = "删除当前用户上传且未被推文使用的媒体文件")
+    @PostMapping("/delete")
+    public Result<Void> delete(@RequestBody DeleteFileReq req) {
+        if (req.getId() == null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件 id 不能为空");
+        }
+        Long userId = requireLogin();
+        UserFileEntity file = userFileMapper.selectOneById(req.getId());
+        if (file == null || !userId.equals(file.getUserId())) {
+            throw new BusinessException(ResultCode.NOT_FOUND.getCode(), "文件不存在或无权删除");
+        }
+        if (file.getPostId() != null) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "该文件已被推文使用，不能删除");
+        }
+        if (file.getObjectKey() == null || file.getObjectKey().isBlank()) {
+            throw new BusinessException(ResultCode.PARAM_ERROR.getCode(), "文件记录缺少对象路径，无法删除");
+        }
+        if (!fileStorageService.delete(file.getObjectKey())) {
+            throw new BusinessException(ResultCode.ERROR.getCode(), "文件删除失败，请稍后重试");
+        }
+        userFileMapper.deleteById(file.getId());
+        return Result.success();
     }
 
     private FileUploadResp toResp(String url, Long fileId, String scene) {

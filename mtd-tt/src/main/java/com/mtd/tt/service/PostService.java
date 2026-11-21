@@ -52,6 +52,7 @@ import com.mtd.tt.util.RedisPostCounter;
 import com.mtd.tt.util.HideMarkdown;
 import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.update.UpdateChain;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -477,6 +478,11 @@ public class PostService {
         postInteractService.refundBounty(post);
         post.setDeletedAt(OffsetDateTime.now());
         postMapper.update(post);
+        // 帖子删除后解除媒体文件绑定，媒体管理里才能正常删除这些文件
+        UpdateChain.of(userFileMapper)
+                .set(UserFileEntity::getPostId, null)
+                .where(UserFileEntity::getPostId).eq(postId)
+                .update();
         // 取消引用/取消转发 = 删除这条推文：把被引用原帖的转发计数与"已转发"关系同步减回去
         if ((PostTypeEnum.QUOTE.getCode().equals(post.getType())
                 || PostTypeEnum.REPOST.getCode().equals(post.getType()))

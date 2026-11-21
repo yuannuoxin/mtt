@@ -16,5 +16,7 @@ public class MyFileItemResp {
     private String mediaType;
     private String contentType;
     private Long size;
+    /** 已绑定的推文 id；非空时不允许删除 */
+    private Long postId;
     private OffsetDateTime createdAt;
 }

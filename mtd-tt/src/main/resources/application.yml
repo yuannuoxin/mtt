@@ -29,7 +29,8 @@ spring:
 
 # MinIO 文件存储
 minio:
-  endpoint: http://103.117.139.151:9000
+  # 本地 RustFS（S3 兼容），bucket 001 需保持公共读
+  endpoint: http://127.0.0.1:9000
   access-key: hj8HDPGvGfslurciteeZ
   secret-key: p1f53RdMA9f4KgMfK82d1hLYJki9ZAzEYENXtePX
   bucket: "001"
@@ -40,7 +41,8 @@ minio:
 # 运行期可用 sys_config 的 file.storage.type 覆盖（30 秒缓存内热生效）
 file:
   storage:
-    type: local
+    # RustFS 对象存储；改回 local 可切回本机磁盘
+    type: minio
   local:
     # 本地存储根目录，相对后端启动目录；也可写绝对路径
     root: ./data/files
