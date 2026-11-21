@@ -101,14 +101,54 @@ public class FileController {
         int max = limit == null ? 100 : Math.max(1, Math.min(limit, 200));
         QueryWrapper wrapper = QueryWrapper.create()
                 .eq(UserFileEntity::getUserId, userId)
-                .eq(UserFileEntity::getScene, "post")
-                .eq(UserFileEntity::getThumbnail, false);
-        if (StrUtil.isNotBlank(mediaType)) {
-            wrapper.eq(UserFileEntity::getMediaType, mediaType.trim());
-        }
+                .eq(UserFileEntity::getScene, "post");
         wrapper.orderBy(UserFileEntity::getCreatedAt, false).orderBy(UserFileEntity::getId, false);
-        List<UserFileEntity> files = userFileMapper.selectListByQuery(wrapper);
-        List<MyFileItemResp> items = files.stream().limit(max).map(f -> {
+        List<UserFileEntity> all = userFileMapper.selectListByQuery(wrapper);
+        // 缩略图与原图是两条独立上传记录（各自 uuid），没有外键；按「同一推文 + 创建时间紧随原图」配对。
+        List<UserFileEntity> thumbs = all.stream()
+                .filter(f -> Boolean.TRUE.equals(f.getThumbnail()))
+                .toList();
+        java.util.Set<Long> usedThumb = new java.util.HashSet<>();
+        String wantedType = StrUtil.isBlank(mediaType) ? null : mediaType.trim();
+        List<MyFileItemResp> items = new java.util.ArrayList<>();
+        for (UserFileEntity f : all) {
+            if (Boolean.TRUE.equals(f.getThumbnail())) {
+                continue;
+            }
+            if (wantedType != null && !wantedType.equals(f.getMediaType())) {
+                continue;
+            }
+            if (items.size() >= max) {
+                break;
+            }
+            UserFileEntity best = null;
+            long bestScore = Long.MAX_VALUE;
+            for (UserFileEntity t : thumbs) {
+                if (usedThumb.contains(t.getId()) || f.getCreatedAt() == null || t.getCreatedAt() == null
+                        || t.getCreatedAt().isBefore(f.getCreatedAt())) {
+                    continue;
+                }
+                long delta = java.time.Duration.between(f.getCreatedAt(), t.getCreatedAt()).toMillis();
+                if (delta > 15_000L) {
+                    continue;
+                }
+                // 未发过帖的原图只配未绑定的缩略图；已发过帖的原图优先同推文的缩略图。
+                if (f.getPostId() == null) {
+                    if (t.getPostId() != null) {
+                        continue;
+                    }
+                } else if (t.getPostId() != null && !t.getPostId().equals(f.getPostId())) {
+                    continue;
+                }
+                long score = delta;
+                if (f.getPostId() != null) {
+                    score = t.getPostId() == null ? delta + (1L << 50) : delta - (1L << 40);
+                }
+                if (score < bestScore) {
+                    bestScore = score;
+                    best = t;
+                }
+            }
             MyFileItemResp item = new MyFileItemResp();
             item.setId(f.getId());
             item.setUrl(f.getUrl());
@@ -117,8 +157,16 @@ public class FileController {
             item.setSize(f.getSize());
             item.setPostId(f.getPostId());
             item.setCreatedAt(f.getCreatedAt());
-            return item;
-        }).toList();
+            if (best != null) {
+                usedThumb.add(best.getId());
+                item.setThumbnailUrl(best.getUrl());
+                // 缩略图已归属旧推文时只复用地址，不返回 id，避免新帖把它从原帖解绑。
+                if (best.getPostId() == null) {
+                    item.setThumbnailFileId(best.getId());
+                }
+            }
+            items.add(item);
+        }
         return Result.success(Map.of("items", items));
     }
 
